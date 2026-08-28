@@ -1,0 +1,7 @@
+# Dependencias para Streamlit Community Cloud.
+# El núcleo (balance/) sólo necesita pandas y numpy; streamlit y plotly son
+# del adaptador de dashboard. Ver pyproject.toml para el detalle.
+streamlit>=1.40
+plotly>=5.20
+pandas>=2.2
+numpy>=1.26
