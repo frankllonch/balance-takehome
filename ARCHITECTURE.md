@@ -2,7 +2,7 @@
 
 Documento para quien tenga que **cambiar** esto, no para quien tenga que
 evaluarlo. El razonamiento de producto y los hallazgos están en
-[`SOLUTION.md`](SOLUTION.md); el enunciado en [`README.md`](README.md) y el
+[`README.md`](README.md); el enunciado original en [`BRIEF.md`](BRIEF.md) y el
 formato de entrada en [`SCHEMA.md`](SCHEMA.md).
 
 ---
@@ -168,7 +168,7 @@ de la cuenta; hoy son dos constantes porque hay dos ficheros.
 
 ```bash
 make install    # entorno + dependencias
-make test       # 91 tests
+make test       # 93 tests
 make run        # análisis por consola
 make json       # el mismo análisis en JSON
 make csv        # frames diario y semanal a out/
