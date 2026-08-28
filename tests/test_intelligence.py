@@ -1,15 +1,15 @@
 """
-Capa 4: qué se avisa, a quién, y qué se calla.
+Layer 3: what gets surfaced, to whom, and what stays quiet.
 
-Tres grupos de test:
+Three groups of test:
 
-* **Comportamiento sobre el dato real.** Las afirmaciones que el dashboard hace
-  en pantalla ("night_drift salta el 19 de mayo", "screen_jump no dispara en
-  ninguno") se convierten aquí en aserciones. Si una recalibración las rompe,
-  el test lo dice antes que el lector.
-* **Propiedades del reparto.** Cupos, separación mínima, cadencia.
-* **El contrato de privacidad.** Lo que sale hacia el tutor no puede contener
-  nombres de app, dominios ni categorías.
+* **Behaviour over the real data.** The claims the dashboard makes on screen
+  ("night_drift fires on 19 May", "screen_jump fires on neither profile")
+  become assertions here. If a recalibration breaks them, the test says so
+  before the reader does.
+* **Allocation properties.** Quotas, minimum gaps, cadence.
+* **The privacy contract.** What goes out to a guardian cannot contain app
+  names, domains or categories.
 """
 
 from __future__ import annotations
@@ -26,205 +26,204 @@ from balance.intelligence import (
 
 
 # ---------------------------------------------------------------------------
-# Avisos al tutor
+# Guardian alerts
 # ---------------------------------------------------------------------------
 
-def test_night_drift_salta_el_19_de_mayo_solo_en_b(df_a, df_b):
+def test_night_drift_fires_on_19_may_for_b_only(df_a, df_b):
     a = [s for s in evaluate_alerts(df_a) if s.key == "night_drift"]
     b = [s for s in evaluate_alerts(df_b) if s.key == "night_drift"]
-    assert a == [], "el usuario A no tiene deriva nocturna que detectar"
+    assert a == [], "user A has no night drift to detect"
     assert len(b) == 1
     assert b[0].day == dt.date(2026, 5, 19)
-    assert b[0].decision == "enviada"
+    assert b[0].decision == "sent"
 
 
-def test_screen_jump_no_dispara_en_ninguno(df_a, df_b):
-    """Control negativo: la regla de volumen convencional.
+def test_screen_jump_fires_on_neither_profile(df_a, df_b):
+    """Negative control: the conventional volume rule.
 
-    Es la que casi cualquier implementación pondría primero, y con estos datos
-    no detecta nada: el uso diario de B sube un 8 % mientras su franja nocturna
-    se multiplica por 13.
+    It is the one almost any implementation would reach for first, and on this
+    data it detects nothing: B's daily use rises 8 % while their night band
+    multiplies by 13.
     """
     for df in (df_a, df_b):
         assert [s for s in evaluate_alerts(df) if s.key == "screen_jump"] == []
 
 
-def test_el_pico_de_contenido_sensible_no_se_notifica(df_b):
-    """Se detecta y baja a resumen semanal: el filtro ya lo paró, y la
-    conversación que queda no gana nada por llegar hoy."""
+def test_the_sensitive_content_spike_is_not_notified(df_b):
+    """Detected and dropped to the weekly summary: the filter already stopped
+    it, and the conversation left gains nothing by arriving today."""
     spike = [s for s in evaluate_alerts(df_b) if s.key == "sensitive_spike"]
     assert len(spike) == 1
-    assert spike[0].decision == "resumen"
+    assert spike[0].decision == "summary"
     assert spike[0].actionability < 0.5
 
 
-def test_el_cupo_de_avisos_se_respeta(df_a, df_b):
+def test_the_alert_quota_is_respected(df_a, df_b):
     for df in (df_a, df_b):
-        enviadas = [s for s in evaluate_alerts(df) if s.decision == "enviada"]
-        assert len(enviadas) <= ALERT_BUDGET
-        fechas = sorted(s.day for s in enviadas)
-        for x, y in zip(fechas, fechas[1:]):
+        sent = [s for s in evaluate_alerts(df) if s.decision == "sent"]
+        assert len(sent) <= ALERT_BUDGET
+        dates = sorted(s.day for s in sent)
+        for x, y in zip(dates, dates[1:]):
             assert (y - x).days >= ALERT_MIN_GAP_DAYS
 
 
-def test_cada_señal_descartada_lleva_motivo(df_b):
+def test_every_dropped_signal_carries_a_reason(df_b):
     for s in evaluate_alerts(df_b):
-        if s.decision != "enviada":
-            assert s.reason, f"{s.key} se descarta sin explicar por qué"
+        if s.decision != "sent":
+            assert s.reason, f"{s.key} is dropped without explaining why"
 
 
-def test_una_racha_de_dias_es_un_episodio_no_uno_por_dia(df_b):
-    """La regla se cumple del 19 al 23 de mayo. Eso es un hecho, no cinco."""
+def test_a_run_of_days_is_one_episode_not_one_per_day(df_b):
+    """The rule holds from 19 to 23 May. That is one fact, not five."""
     drift = [s for s in evaluate_alerts(df_b) if s.key == "night_drift"][0]
     assert drift.days_true == 5
     assert drift.until == dt.date(2026, 5, 23)
 
 
 # ---------------------------------------------------------------------------
-# Refuerzos
+# Reinforcements
 # ---------------------------------------------------------------------------
 
-def test_el_perfil_sano_recibe_refuerzos(df_a):
-    """Un sistema que sólo habla cuando algo empeora se lee como una amenaza."""
+def test_the_healthy_profile_receives_reinforcements(df_a):
+    """A system that only speaks when something gets worse reads as a threat."""
     pos = [s for s in evaluate_positives(df_a, has_guardian=False)
-           if s.decision == "enviada"]
+           if s.decision == "sent"]
     assert len(pos) >= 2
-    assert all(s.audience == "usuario" for s in pos)
+    assert all(s.audience == "user" for s in pos)
 
 
-def test_sin_tutor_no_se_generan_refuerzos_para_tutor(df_a):
+def test_no_guardian_means_no_guardian_reinforcements(df_a):
     pos = evaluate_positives(df_a, has_guardian=False)
-    assert all(s.audience != "tutor" for s in pos)
+    assert all(s.audience != "guardian" for s in pos)
 
 
-def test_el_tutor_de_b_recibe_aviso_y_refuerzo(df_b):
-    """El canal al tutor no puede ser sólo malas noticias."""
-    avisos = [s for s in evaluate_alerts(df_b) if s.decision == "enviada"]
-    refuerzos = [s for s in evaluate_positives(df_b, True)
-                 if s.decision == "enviada" and s.audience == "tutor"]
-    assert len(avisos) == 1 and len(refuerzos) == 1
+def test_b_guardian_receives_an_alert_and_a_reinforcement(df_b):
+    """The guardian channel cannot be only bad news."""
+    alerts = [s for s in evaluate_alerts(df_b) if s.decision == "sent"]
+    positives = [s for s in evaluate_positives(df_b, True)
+                 if s.decision == "sent" and s.audience == "guardian"]
+    assert len(alerts) == 1 and len(positives) == 1
 
 
-def test_el_cupo_de_refuerzos_separa_al_menos_una_semana(df_a, df_b):
+def test_the_reinforcement_quota_keeps_at_least_a_week_apart(df_a, df_b):
     for df, hg in ((df_a, False), (df_b, True)):
-        enviados = [s for s in evaluate_positives(df, hg)
-                    if s.decision == "enviada"]
-        por_audiencia = {}
-        for s in sorted(enviados, key=lambda x: x.day):
-            prev = por_audiencia.get(s.audience)
+        sent = [s for s in evaluate_positives(df, hg) if s.decision == "sent"]
+        by_audience = {}
+        for s in sorted(sent, key=lambda x: x.day):
+            prev = by_audience.get(s.audience)
             if prev:
                 assert (s.day - prev).days >= POS_BUDGET_DAYS
-            por_audiencia[s.audience] = s.day
+            by_audience[s.audience] = s.day
 
 
-def test_los_refuerzos_no_dan_instrucciones(df_a, df_b):
-    """El tono es descriptivo. Si aparece una recomendación, el test la caza."""
-    prohibidas = ("deberías", "deberia", "intenta", "prueba a", "te recomend",
-                  "buen momento para", "podrías", "recuerda que deb")
+def test_reinforcements_do_not_give_instructions(df_a, df_b):
+    """The tone is descriptive. If a recommendation slips in, this catches it."""
+    banned = ("you should", "try to", "we recommend", "good time to",
+              "you could", "remember to", "make sure you", "consider ")
     for df, hg in ((df_a, False), (df_b, True)):
         for s in evaluate_positives(df, hg) + evaluate_alerts(df):
-            texto = s.guardian_text.lower()
-            for frase in prohibidas:
-                assert frase not in texto, f"{s.key}: «{s.guardian_text}»"
+            text = s.guardian_text.lower()
+            for phrase in banned:
+                assert phrase not in text, f"{s.key}: \"{s.guardian_text}\""
 
 
 # ---------------------------------------------------------------------------
-# Nudge en dispositivo
+# On-device nudge
 # ---------------------------------------------------------------------------
 
-def test_el_nudge_no_dispara_en_el_perfil_sano(tl_a, df_a):
+def test_the_nudge_does_not_fire_on_the_healthy_profile(tl_a, df_a):
     ns = nudge_summary(replay_nudge(tl_a, df_a))
-    assert ns["noches con aviso"] == 0, "cero falsos positivos sin configurar nada"
+    assert ns["nights with a nudge"] == 0, "zero false positives, no config needed"
 
 
-def test_el_nudge_dispara_en_b_y_deja_margen_medible(tl_b, df_b):
+def test_the_nudge_fires_on_b_and_leaves_measurable_headroom(tl_b, df_b):
     ns = nudge_summary(replay_nudge(tl_b, df_b))
-    assert ns["noches con aviso"] == 14
-    assert 0.30 < ns["cuota del total nocturno"] < 0.45
+    assert ns["nights with a nudge"] == 14
+    assert 0.30 < ns["share of night total"] < 0.45
 
 
-def test_toda_noche_sin_nudge_tiene_motivo(tl_b, df_b):
+def test_every_night_without_a_nudge_has_a_reason(tl_b, df_b):
     for n in replay_nudge(tl_b, df_b):
-        assert n.fired or n.quiet_reason, f"{n.day}: ni dispara ni explica"
+        assert n.fired or n.quiet_reason, f"{n.day}: neither fires nor explains"
 
 
 # ---------------------------------------------------------------------------
-# Contrato de privacidad
+# Privacy contract
 # ---------------------------------------------------------------------------
 
-def _texto_hacia_el_tutor(tl, df, has_guardian: bool) -> str:
-    """Todo lo que saldría del dispositivo hacia un tutor, concatenado."""
+def _guardian_text(tl, df, has_guardian: bool) -> str:
+    """Everything that would leave the device towards a guardian, concatenated."""
     sigs = evaluate_alerts(df) + evaluate_positives(df, has_guardian)
-    piezas = [s.guardian_text for s in sigs
-              if s.audience == "tutor" and s.decision == "enviada"]
-    piezas += [s.headline for s in sigs
-               if s.audience == "tutor" and s.decision == "enviada"]
-    piezas.append(json.dumps(guardian_digest(df, sigs), ensure_ascii=False))
-    return " ".join(piezas).lower()
+    pieces = [s.guardian_text for s in sigs
+              if s.audience == "guardian" and s.decision == "sent"]
+    pieces += [s.headline for s in sigs
+               if s.audience == "guardian" and s.decision == "sent"]
+    pieces.append(json.dumps(guardian_digest(df, sigs), ensure_ascii=False))
+    return " ".join(pieces).lower()
 
 
-def test_el_payload_del_tutor_no_contiene_apps_ni_dominios(tl_b, df_b):
-    """El contrato de privacidad, como aserción y no como promesa del README."""
-    fuera = _texto_hacia_el_tutor(tl_b, df_b, True)
+def test_the_guardian_payload_contains_no_apps_or_domains(tl_b, df_b):
+    """The privacy contract, as an assertion rather than a README promise."""
+    outbound = _guardian_text(tl_b, df_b, True)
 
-    paquetes = {e["package_name"] for e in tl_b.events if e["package_name"]}
-    dominios = {e["url_domain"] for e in tl_b.events if e["url_domain"]}
+    packages = {e["package_name"] for e in tl_b.events if e["package_name"]}
+    domains = {e["url_domain"] for e in tl_b.events if e["url_domain"]}
 
-    # Se comprueba el identificador completo y también su raíz ("pornhub" de
-    # pornhub.com, "whatsapp" de com.whatsapp), que es como se filtraría de
-    # verdad un dato. Raíces de menos de cuatro letras se saltan: la "x" de
-    # x.com aparece en cualquier texto en castellano y daría falso positivo.
-    def raices(ident: str) -> list[str]:
-        partes = [ident] + ident.replace("/", ".").split(".")
-        return [p.lower() for p in partes if len(p) >= 4]
+    # The full identifier is checked and so is its stem ("pornhub" from
+    # pornhub.com, "whatsapp" from com.whatsapp), which is how a value would
+    # actually leak. Stems under four letters are skipped: the "x" of x.com
+    # appears in any prose and would be a false positive.
+    def stems(ident: str) -> list[str]:
+        parts = [ident] + ident.replace("/", ".").split(".")
+        return [p.lower() for p in parts if len(p) >= 4]
 
-    for ident in paquetes | dominios:
-        for raiz in raices(ident):
-            assert raiz not in fuera, f"«{raiz}» se ha filtrado al tutor"
+    for ident in packages | domains:
+        for stem in stems(ident):
+            assert stem not in outbound, f"\"{stem}\" leaked to the guardian"
 
 
-def test_el_payload_del_tutor_no_nombra_categorias(tl_b, df_b):
-    fuera = _texto_hacia_el_tutor(tl_b, df_b, True)
+def test_the_guardian_payload_names_no_categories(tl_b, df_b):
+    outbound = _guardian_text(tl_b, df_b, True)
     for cat in CATEGORIES:
-        assert cat.lower() not in fuera
+        assert cat.lower() not in outbound
 
 
-def test_el_resumen_al_tutor_va_redondeado(df_b):
-    """Un valor fino («247 minutos, índice 41,3») identifica a una persona."""
+def test_the_guardian_digest_is_rounded(df_b):
+    """A fine-grained value ("247 minutes, index 41.3") identifies a person."""
     d = guardian_digest(df_b, evaluate_alerts(df_b))
-    assert d["pantalla al día"].endswith("h aprox.")
-    indice = int(d["índice de bienestar"].split()[0])
-    assert indice % 5 == 0, "el índice sale en múltiplos de 5"
-    assert d["contenido sensible abierto"] == "ninguno"
+    assert d["screen time per day"].startswith("about ")
+    index = int(d["wellbeing index"].split()[0])
+    assert index % 5 == 0, "the index comes out in multiples of 5"
+    assert d["sensitive content opened"] == "none"
 
 
-def test_ningun_contenido_sensible_llego_a_abrirse(tl_a, tl_b):
-    """La afirmación que el resumen del tutor transmite, verificada en el
-    stream: no hay ni un URL_VISIT ni un APP_FOREGROUND con esas categorías."""
+def test_no_sensitive_content_ever_opened(tl_a, tl_b):
+    """The claim the guardian digest transmits, verified against the stream:
+    there is no URL_VISIT nor APP_FOREGROUND with those categories."""
     from balance.events import SENSITIVE
     for tl in (tl_a, tl_b):
-        abiertos = [e for e in tl.events
-                    if e["event_type"] in ("URL_VISIT", "APP_FOREGROUND")
-                    and e["category"] in SENSITIVE]
-        assert abiertos == []
+        opened = [e for e in tl.events
+                  if e["event_type"] in ("URL_VISIT", "APP_FOREGROUND")
+                  and e["category"] in SENSITIVE]
+        assert opened == []
 
 
 # ---------------------------------------------------------------------------
-# Recorrido del mes
+# Month walkthrough
 # ---------------------------------------------------------------------------
 
-def test_el_recorrido_no_reinicia_el_cupo_de_refuerzos(tl_b, df_b):
-    """Bug real: recalcular los refuerzos por prefijo reiniciaba el cupo cada
-    día y multiplicaba los envíos. Deben coincidir con el cálculo único."""
+def test_the_walkthrough_does_not_reset_the_reinforcement_quota(tl_b, df_b):
+    """A real bug: recomputing reinforcements per prefix reset the quota every
+    day and multiplied the sends. They must match the single computation."""
     pos = evaluate_positives(df_b, True)
     replay = month_replay(df_b, replay_nudge(tl_b, df_b), pos)
-    en_recorrido = sum(len(r["positives"]) for r in replay)
-    esperados = sum(1 for s in pos if s.decision == "enviada")
-    assert en_recorrido == esperados
+    in_walkthrough = sum(len(r["positives"]) for r in replay)
+    expected = sum(1 for s in pos if s.decision == "sent")
+    assert in_walkthrough == expected
 
 
-def test_el_recorrido_solo_usa_informacion_pasada(tl_b, df_b):
-    """El teléfono del día 12 no sabía lo que iba a pasar el 19."""
+def test_the_walkthrough_only_uses_past_information(tl_b, df_b):
+    """The phone on the 12th did not know what would happen on the 19th."""
     replay = month_replay(df_b, replay_nudge(tl_b, df_b),
                           evaluate_positives(df_b, True))
     for r in replay:
@@ -233,10 +232,29 @@ def test_el_recorrido_solo_usa_informacion_pasada(tl_b, df_b):
         assert r["alerts_so_far"] <= ALERT_BUDGET
 
 
-def test_las_emisiones_cubren_los_tres_destinos(tl_b, df_b):
+def test_emissions_cover_the_three_destinations(tl_b, df_b):
     replay = month_replay(df_b, replay_nudge(tl_b, df_b),
                           evaluate_positives(df_b, True))
-    destinos = {e["destino"] for e in emissions(replay)}
-    assert "Usuario · pantalla" in destinos
-    assert "Tutor · notificación" in destinos
-    assert "Tutor · refuerzo" in destinos
+    destinations = {e["destination"] for e in emissions(replay)}
+    assert "User · screen" in destinations
+    assert "Guardian · notification" in destinations
+    assert "Guardian · reinforcement" in destinations
+
+
+def test_the_decision_vocabulary_is_the_one_the_charts_expect():
+    """The rail markers key off these exact strings.
+
+    They were left in Spanish once during the translation and the guardian
+    markers silently vanished from the walkthrough: the traces were built from
+    an empty list and nothing failed.
+    """
+    from balance.intelligence import Signal
+    import balance.charts as charts
+    import inspect
+
+    source = inspect.getsource(charts.tracked_series)
+    assert '== "sent"' in source
+    assert '== "summary"' in source
+    assert Signal(key="k", day=dt.date(2026, 5, 1), headline="h",
+                  guardian_text="t", magnitude=1, persistence=1,
+                  actionability=1).decision == "candidate"

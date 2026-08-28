@@ -1,7 +1,7 @@
 """
-Capa 1 · Timeline → métricas diarias y semanales.
+Layer 1 · Timeline → daily and weekly metrics.
 
-Una fila por día y usuario. Todo lo que el dashboard dibuja sale de aquí.
+One row per day and user. Everything the dashboard draws comes from here.
 """
 
 from __future__ import annotations
@@ -16,11 +16,11 @@ from .events import (
     DISTRACTING, SENSITIVE, Interval, Timeline, app_label, midnight_ms, to_dt,
 )
 
-#: Ventana de vigilia. Fuera de ella el "tiempo offline" no es mérito: estás
-#: durmiendo. Se usa para normalizar offline y racha más larga sin pantalla.
-WAKE_START, WAKE_END = 7, 23        # 07:00 – 23:00 hora local
+#: Waking window. Outside it, "offline time" is no achievement: you are
+#: asleep. Used to normalise offline time and the longest screen-free stretch.
+WAKE_START, WAKE_END = 7, 23        # 07:00 – 23:00 local time
 
-#: Franja nocturna protegida: uso aquí es el que más cuesta al descanso.
+#: Protected night band: use here is what costs rest the most.
 NIGHT_START, NIGHT_END = 23, 6      # 23:00 – 06:00
 
 
@@ -34,21 +34,21 @@ def _window_ms(d: date, h0: int, h1: int) -> tuple[int, int]:
 
 
 def _night_window(d: date) -> tuple[int, int]:
-    """La **noche del día d**: 23:00 de d → 06:00 de d+1.
+    """The **night of day d**: 23:00 on d → 06:00 on d+1.
 
-    El día natural sigue cortando a medianoche (lo pide el enunciado), pero el
-    sueño no. Un mensaje a la 01:30 del martes pertenece a la noche del lunes,
-    y así es como lo cuenta el usuario. Mantener las dos convenciones a la vez
-    evita partir una misma noche en dos filas.
+    The calendar day still cuts at midnight, but sleep does not. A message at
+    01:30 on Tuesday belongs to Monday night, and that is how the user counts
+    it. Keeping both conventions at once avoids splitting one night across two
+    rows.
     """
     base = midnight_ms(d)
     return base + NIGHT_START * 3600_000, base + (24 + NIGHT_END) * 3600_000
 
 
 def _shift_h(ms: int | None) -> float | None:
-    """Hora del día en un eje que empieza a las 04:00, de forma que la
-    madrugada (00:00–04:00) sale como 24–28 y no como 0–4. Sin esto, la media
-    de 'hora de último uso' baja cuando alguien se acuesta *más tarde*."""
+    """Time of day on an axis starting at 04:00, so the small hours (00:00 to
+    04:00) come out as 24 to 28 rather than 0 to 4. Without this, the mean
+    "time of last screen" *drops* when someone goes to bed *later*."""
     if not ms:
         return None
     t = to_dt(ms)
@@ -60,28 +60,32 @@ def _fmt_clock(ms: int | None) -> str | None:
     return to_dt(ms).strftime("%H:%M") if ms else None
 
 
-#: Nombre del día y franja horaria, para poder decir "el sábado por la tarde"
-#: en vez de sólo "3 h 47 min". La duración sin el cuándo no sitúa nada.
-DIAS_ES = ["el lunes", "el martes", "el miércoles", "el jueves",
-           "el viernes", "el sábado", "el domingo"]
-FRANJAS = [(6, "por la mañana"), (12, "al mediodía"), (15, "por la tarde"),
-           (20, "por la noche"), (24, "de madrugada")]
+#: Day name and time band, so we can say "Saturday afternoon" instead of just
+#: "3 h 47 min". A duration without the when does not situate anything.
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday",
+             "Friday", "Saturday", "Sunday"]
+# The limit is the *upper* bound of each band: hours below 6 are early
+# morning, below 12 morning, and so on. The Spanish version this was
+# translated from had the list off by one, so 03:00 read as "morning" and
+# 10:00 as "midday".
+BANDS = [(6, "early morning"), (12, "morning"), (15, "midday"),
+         (20, "afternoon"), (24, "evening")]
 
 
-def _franja(ms: int) -> str:
-    """`ms` → "el sábado por la tarde"."""
+def _when(ms: int) -> str:
+    """`ms` → "Saturday afternoon"."""
     t = to_dt(ms)
-    tramo = next(nombre for limite, nombre in FRANJAS if t.hour < limite)
-    return f"{DIAS_ES[t.weekday()]} {tramo}"
+    band = next(name for limit, name in BANDS if t.hour < limit)
+    return f"{DAY_NAMES[t.weekday()]} {band}"
 
 
 def _longest_gap(intervals: list[Interval], w0: int,
                  w1: int) -> tuple[float, int | None]:
-    """Racha más larga sin pantalla dentro de la vigilia, y cuándo empieza.
+    """Longest screen-free stretch inside the waking window, and when it starts.
 
-    Devuelve el inicio además de la duración porque una racha sin momento no
-    dice nada: "3 h 47 min" es un número, "3 h 47 min el sábado por la tarde"
-    es algo que la persona reconoce.
+    Returns the start alongside the duration because a stretch without a moment
+    says nothing: "3 h 47 min" is a number, "3 h 47 min on Saturday afternoon"
+    is something the person recognises.
     """
     pts = sorted((max(i.start_ms, w0), min(i.end_ms, w1))
                  for i in intervals if i.end_ms > w0 and i.start_ms < w1)
@@ -96,7 +100,7 @@ def _longest_gap(intervals: list[Interval], w0: int,
 
 
 def daily_frame(tl: Timeline) -> pd.DataFrame:
-    """Una fila por día con todas las métricas base."""
+    """One row per day with every base metric."""
     by_day_iv: dict[date, list[Interval]] = defaultdict(list)
     for iv in tl.intervals:
         by_day_iv[iv.day].append(iv)
@@ -109,11 +113,11 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
     for b in tl.blocks:
         by_day_block[b.day].append(b)
 
-    # Cambios de app: transición real de foreground entre paquetes distintos.
-    # El contador se reinicia en cada día. Sin eso, la primera app de la mañana
-    # cuenta como cambio respecto a la última de la noche anterior, lo que
-    # sumaba un cambio falso por día (~5 % del total) y, peor, hacía que un
-    # "cambio" abarcase ocho horas de sueño.
+    # App switches: a real foreground transition between different packages.
+    # The counter resets every day. Without that, the first app of the morning
+    # counts as a switch from the last one of the night before, which added one
+    # false switch per day (~5 % of the total) and, worse, made a "switch" span
+    # eight hours of sleep.
     switches_by_day: Counter = Counter()
     last_key_by_day: dict[date, str] = {}
     for u in sorted(tl.usages, key=lambda x: x.start_ms):
@@ -140,18 +144,19 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
         w0, w1 = _window_ms(d, WAKE_START, WAKE_END)
         screen_wake_s = sum(_overlap_s(i.start_ms, i.end_ms, w0, w1) for i in ivs)
 
-        # la noche se mide sobre TODOS los tramos, no sólo los de este día:
-        # la noche del día d se extiende hasta las 06:00 del día siguiente.
+        # the night is measured over ALL stretches, not only this day's: the
+        # night of day d runs until 06:00 the next day.
         n0, n1 = _night_window(d)
         night_s = sum(_overlap_s(i.start_ms, i.end_ms, n0, n1) for i in tl.intervals)
         night_pickups = sum(i.pickups for i in tl.intervals if n0 <= i.start_ms < n1)
         night_last = max((i.end_ms for i in tl.intervals
                           if i.start_ms < n1 and i.end_ms > n0), default=None)
 
-        # "Primer pickup" = el primero a partir de las 06:00. Sin ese corte, un
-        # día que arranca a las 00:20 (cola de la noche anterior) se registraría
-        # como "empezó a las 00:20", que no es empezar el día: es no haberlo
-        # terminado. Ese fenómeno se mide aparte, en `night_*`.
+        # "First pickup" = the first one from 06:00 onwards. Without that
+        # floor, a day starting at 00:20 (the tail of the previous night) would
+        # register as "started at 00:20", which is not starting the day: it is
+        # not having finished it. That phenomenon is measured separately, in
+        # `night_*`.
         offline_s, offline_start = _longest_gap(ivs, w0, w1)
 
         morning = midnight_ms(d) + NIGHT_END * 3600_000
@@ -171,8 +176,8 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
         bt = Counter(b.block_type for b in blocks)
         bc = Counter(b.category for b in blocks)
 
-        # cuánto del día natural cubre realmente el fichero. El último día de
-        # user_b sólo llega hasta las 00:46; promediarlo hundiría las medias.
+        # how much of the calendar day the file actually covers. The last day
+        # of user_b only reaches 00:46; averaging it would sink the means.
         d0, d1 = midnight_ms(d), midnight_ms(d + timedelta(days=1))
         coverage_h = max(0, min(file_end, d1) - max(file_start, d0)) / 3600_000
 
@@ -191,7 +196,7 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
             "offline_wake_h": max(0.0, (w1 - w0) / 1000 - screen_wake_s) / 3600,
             "sessions": len(ivs),
             "longest_session_s": max((i.seconds for i in ivs), default=0),
-            # mediana de verdad: con n par, la media de los dos centrales
+            # a real median: with even n, the mean of the two middle values
             "median_session_s": (median(i.seconds for i in ivs) if ivs else 0),
 
             "pickups": pickups,
@@ -210,7 +215,7 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
             "longest_offline_s": offline_s,
             "longest_offline_h": offline_s / 3600,
             "longest_offline_start_ms": offline_start,
-            "longest_offline_when": (_franja(offline_start)
+            "longest_offline_when": (_when(offline_start)
                                      if offline_start else None),
 
             "distinct_apps": len({u.key for u in uses if u.kind == "app"}),
@@ -240,12 +245,12 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
         })
 
     df = pd.DataFrame(rows).set_index("day", drop=False)
-    df = df[~df["is_partial"]].copy()      # fuera los días truncados por el fichero
+    df = df[~df["is_partial"]].copy()      # drop days truncated by the file edge
     df["first_pickup_clock"] = [_fmt_clock(m) for m in df["first_pickup_ms"]]
     df["last_use_clock"] = [_fmt_clock(m) for m in df["last_use_ms"]]
 
-    # baseline personal: mediana móvil de los 14 días anteriores (sin el de hoy).
-    # Mediana y no media: un festivo raro no debe mover "lo normal en mí".
+    # personal baseline: rolling median of the previous 14 days (today excluded).
+    # Median rather than mean: one odd holiday should not move "normal for me".
     for col in ("screen_min", "pickups", "night_min", "blocks"):
         df[f"{col}_baseline"] = df[col].shift(1).rolling(14, min_periods=5).median()
         df[f"{col}_delta"] = df[col] - df[f"{col}_baseline"]
@@ -257,11 +262,11 @@ def daily_frame(tl: Timeline) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def totals(tl: Timeline, df: pd.DataFrame, kind: str) -> pd.DataFrame:
-    """Ranking de apps o dominios por tiempo total y aperturas.
+    """Ranking of apps or domains by total time and openings.
 
-    `df` fija qué días cuentan: los truncados por el borde del fichero ya se
-    han caído de él, y aquí tienen que caerse igual para que los totales
-    cuadren con los KPI.
+    `df` decides which days count: the ones truncated by the file edge have
+    already dropped out of it, and they have to drop out here too so the totals
+    match the KPIs.
     """
     days = set(df["day"])
     secs: Counter = Counter()
@@ -287,7 +292,7 @@ def totals(tl: Timeline, df: pd.DataFrame, kind: str) -> pd.DataFrame:
 
 
 def category_daily(df: pd.DataFrame) -> pd.DataFrame:
-    """Minutos por categoría y día (formato largo, listo para plotly)."""
+    """Minutes per category and day (long format, ready for plotly)."""
     rows = []
     for d, cats in zip(df["day"], df["_cat_s"]):
         for c, s in cats.items():
@@ -296,7 +301,7 @@ def category_daily(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def hourly_heat(tl: Timeline, days: set[date] | None = None) -> pd.DataFrame:
-    """Minutos de pantalla por (día de la semana, hora): reloj de uso."""
+    """Screen minutes per (weekday, hour): a usage clock."""
     grid: Counter = Counter()
     for iv in tl.intervals:
         if days is not None and iv.day not in days:
@@ -321,11 +326,11 @@ def blocks_frame(tl: Timeline, days: set[date] | None = None) -> pd.DataFrame:
 
 
 def weekly_frame(df: pd.DataFrame) -> pd.DataFrame:
-    """Una fila por semana, con la variación respecto a la semana anterior.
+    """One row per week, with the change against the previous week.
 
-    Las mismas magnitudes que el frame diario pero promediadas por día, para
-    que una semana corta (la última del periodo suele serlo) no parezca mejor
-    sólo por tener menos días. `is_partial` marca las que no llegan a 7.
+    The same magnitudes as the daily frame but averaged per day, so a short
+    week (the last one of the period usually is) does not look better just for
+    having fewer days. `is_partial` flags the ones under 7.
     """
     w = df.groupby("week").agg(
         days=("day", "count"),
@@ -347,8 +352,8 @@ def weekly_frame(df: pd.DataFrame) -> pd.DataFrame:
         blocks_sensitive=("blocks_sensitive", "sum"),
         score=("score", "mean"),
     )
-    # El "cuándo" de la mejor racha de cada semana: es la frase que convierte
-    # una duración en algo que la persona reconoce.
+    # The "when" of each week's best stretch: the phrase that turns a duration
+    # into something the person recognises.
     mejor = df.loc[df.groupby("week")["longest_offline_s"].idxmax()]
     w["best_offline_when"] = mejor.set_index("week")["longest_offline_when"]
     w["best_offline_day"] = mejor.set_index("week")["day"]

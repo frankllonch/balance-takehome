@@ -1,9 +1,9 @@
 """
-Capa 0: reconstrucción de pantalla, sesiones y atribución de tiempo.
+Layer 0: screen reconstruction, sessions and time attribution.
 
-Es la capa donde se decide si todo lo demás es cierto, y la única que trata con
-un stream que no viene limpio. Cada caso raro observado en los ficheros reales
-tiene aquí su test sintético.
+This is the layer that decides whether everything above it is true, and the
+only one dealing with a stream that does not arrive clean. Every odd case seen
+in the real files has its synthetic test here.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from balance.events import MAX_FOREGROUND_S
 from conftest import DAY0, build, ev, ts
 
 
-def test_pickup_simple(tmp_path):
-    """ON seguido de USER_PRESENT es un desbloqueo real, no un vistazo."""
+def test_a_pickup_is_an_unlock(tmp_path):
+    """ON followed by USER_PRESENT is a real unlock, not a glance."""
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:05", is_keyguard_locked=False),
@@ -28,9 +28,9 @@ def test_pickup_simple(tmp_path):
     assert tl.intervals[0].seconds == 600
 
 
-def test_glance_sin_desbloqueo(tmp_path):
-    """ON sin USER_PRESENT es un vistazo: la pantalla se encendió, el teléfono
-    no se abrió."""
+def test_a_screen_on_without_unlock_is_a_glance(tmp_path):
+    """ON with no USER_PRESENT is a glance: the screen came on, the phone was
+    never opened."""
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("SCREEN_OFF", 0, "09:00:12"),
@@ -41,12 +41,12 @@ def test_glance_sin_desbloqueo(tmp_path):
     assert tl.intervals[0].is_pickup is False
 
 
-def test_tramos_solapados_son_un_solo_intervalo(tmp_path):
-    """El caso que rompe el emparejado ingenuo.
+def test_overlapping_stretches_are_a_single_interval(tmp_path):
+    """The case that breaks naive pairing.
 
-    ON(09:00) ON(09:04) OFF(09:06) OFF(09:11) aparece 74 veces en user_a y 345
-    en user_b. Emparejando por pares saldrían 2+5=7 minutos; físicamente la
-    pantalla estuvo encendida de 09:00 a 09:11, que son 11.
+    ON(09:00) ON(09:04) OFF(09:06) OFF(09:11) shows up 77 times in user_a and
+    411 in user_b. Pairing them off gives 2+5=7 minutes; physically the screen
+    was on from 09:00 to 09:11, which is 11.
     """
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
@@ -57,12 +57,12 @@ def test_tramos_solapados_son_un_solo_intervalo(tmp_path):
         ev("SCREEN_OFF", 0, "09:11"),
     ], tmp_path=tmp_path)
 
-    assert len(tl.intervals) == 1, "la unión es un solo tramo, no dos"
+    assert len(tl.intervals) == 1, "the union is one stretch, not two"
     assert tl.intervals[0].seconds == 11 * 60
-    assert tl.intervals[0].pickups == 2, "los dos desbloqueos siguen contando"
+    assert tl.intervals[0].pickups == 2, "both unlocks still count"
 
 
-def test_dos_on_seguidos_sin_desbloqueo_son_dos_vistazos(tmp_path):
+def test_two_ons_without_unlock_are_two_glances(tmp_path):
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("SCREEN_ON", 0, "09:01", is_keyguard_locked=True),
@@ -74,8 +74,8 @@ def test_dos_on_seguidos_sin_desbloqueo_son_dos_vistazos(tmp_path):
     assert tl.intervals[0].pickups == 0
 
 
-def test_user_present_sin_screen_on_abre_tramo(tmp_path):
-    """Cuatro casos así en user_b. Se abre tramo y se registra la anomalía."""
+def test_user_present_without_screen_on_opens_a_stretch(tmp_path):
+    """A stretch is opened and the anomaly is recorded rather than dropped."""
     tl = build([
         ev("USER_PRESENT", 0, "09:00", is_keyguard_locked=False),
         ev("SCREEN_OFF", 0, "09:05"),
@@ -83,10 +83,10 @@ def test_user_present_sin_screen_on_abre_tramo(tmp_path):
 
     assert len(tl.intervals) == 1
     assert tl.intervals[0].seconds == 300
-    assert tl.anomalies["USER_PRESENT sin SCREEN_ON"] == 1
+    assert tl.anomalies["USER_PRESENT with no SCREEN_ON"] == 1
 
 
-def test_screen_off_con_pantalla_apagada_se_ignora(tmp_path):
+def test_screen_off_while_already_off_is_ignored(tmp_path):
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("SCREEN_OFF", 0, "09:05"),
@@ -94,11 +94,11 @@ def test_screen_off_con_pantalla_apagada_se_ignora(tmp_path):
     ], tmp_path=tmp_path)
 
     assert len(tl.intervals) == 1
-    assert tl.anomalies["SCREEN_OFF con pantalla apagada"] == 1
+    assert tl.anomalies["SCREEN_OFF while screen already off"] == 1
 
 
-def test_tramo_que_cruza_medianoche_se_parte(tmp_path):
-    """El screen time diario tiene que sumar exactamente el día."""
+def test_a_stretch_crossing_midnight_is_split(tmp_path):
+    """Daily screen time has to add up to exactly that day."""
     tl = build([
         ev("SCREEN_ON", 0, "23:40", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "23:40:05", is_keyguard_locked=False),
@@ -110,10 +110,10 @@ def test_tramo_que_cruza_medianoche_se_parte(tmp_path):
     assert a.day == DAY0 and b.day == DAY0 + dt.timedelta(days=1)
     assert a.seconds == 20 * 60 and b.seconds == 20 * 60
     assert a.pickups == 1 and b.pickups == 0, \
-        "el desbloqueo pertenece al día en que se produjo"
+        "the unlock belongs to the day it happened on"
 
 
-def test_fichero_que_acaba_con_la_pantalla_encendida(tmp_path):
+def test_file_ending_with_the_screen_on(tmp_path):
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -122,15 +122,15 @@ def test_fichero_que_acaba_con_la_pantalla_encendida(tmp_path):
     ], tmp_path=tmp_path)
 
     assert len(tl.intervals) == 1
-    assert tl.anomalies["tramo abierto al final del fichero"] == 1
+    assert tl.anomalies["stretch left open at end of file"] == 1
     assert tl.intervals[0].end_ms == ts(0, "09:01")
 
 
 # ---------------------------------------------------------------------------
-# Atribución de tiempo
+# Time attribution
 # ---------------------------------------------------------------------------
 
-def test_tiempo_de_app_hasta_el_siguiente_foreground(tmp_path):
+def test_app_time_runs_to_the_next_foreground(tmp_path):
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -141,13 +141,13 @@ def test_tiempo_de_app_hasta_el_siguiente_foreground(tmp_path):
         ev("SCREEN_OFF", 0, "09:10"),
     ], tmp_path=tmp_path)
 
-    por_app = {u.key: u.seconds for u in tl.usages}
-    assert por_app["com.whatsapp"] == 3 * 60
-    assert por_app["com.spotify.music"] == 6 * 60
+    per_app = {u.key: u.seconds for u in tl.usages}
+    assert per_app["com.whatsapp"] == 3 * 60
+    assert per_app["com.spotify.music"] == 6 * 60
 
 
-def test_el_dominio_le_quita_el_tiempo_al_navegador(tmp_path):
-    """Chrome es un contenedor, no un destino: el tiempo va al dominio."""
+def test_the_domain_takes_the_time_off_the_browser(tmp_path):
+    """Chrome is a container, not a destination: the time goes to the domain."""
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -157,13 +157,14 @@ def test_el_dominio_le_quita_el_tiempo_al_navegador(tmp_path):
         ev("SCREEN_OFF", 0, "09:06"),
     ], tmp_path=tmp_path)
 
-    por_clave = {u.key: u.seconds for u in tl.usages}
-    assert por_clave["com.android.chrome"] == 50
-    assert por_clave["bbc.com"] == 5 * 60
+    per_key = {u.key: u.seconds for u in tl.usages}
+    assert per_key["com.android.chrome"] == 50
+    assert per_key["bbc.com"] == 5 * 60
 
 
-def test_eventos_con_pantalla_apagada_no_generan_tiempo(tmp_path):
-    """Música de fondo y sincronizaciones. 17 casos en user_a, 344 en user_b."""
+def test_events_with_the_screen_off_generate_no_time(tmp_path):
+    """Background music and sync. Never happens in the two sample files; the
+    guard is there because a real device does produce them."""
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -173,10 +174,10 @@ def test_eventos_con_pantalla_apagada_no_generan_tiempo(tmp_path):
     ], tmp_path=tmp_path)
 
     assert tl.usages == []
-    assert tl.anomalies["APP_FOREGROUND con pantalla apagada"] == 1
+    assert tl.anomalies["APP_FOREGROUND with screen off"] == 1
 
 
-def test_un_bloque_cierra_el_foreground_pero_no_consume_tiempo(tmp_path):
+def test_a_block_closes_the_foreground_but_consumes_no_time(tmp_path):
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -193,8 +194,8 @@ def test_un_bloque_cierra_el_foreground_pero_no_consume_tiempo(tmp_path):
     assert tl.blocks[0].block_type == "APP"
 
 
-def test_tope_de_primer_plano(tmp_path):
-    """Si falta el SCREEN_OFF, una app no puede acumular horas."""
+def test_foreground_cap(tmp_path):
+    """If the SCREEN_OFF is missing, an app cannot pile up hours."""
     tl = build([
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),
         ev("USER_PRESENT", 0, "09:00:02", is_keyguard_locked=False),
@@ -206,8 +207,8 @@ def test_tope_de_primer_plano(tmp_path):
     assert tl.usages[0].seconds == MAX_FOREGROUND_S
 
 
-def test_los_eventos_se_ordenan_aunque_lleguen_desordenados(tmp_path):
-    """El schema promete orden temporal, pero `load` no se fía."""
+def test_events_are_sorted_even_if_they_arrive_out_of_order(tmp_path):
+    """The format promises time order, but `load` does not take it on trust."""
     tl = build([
         ev("SCREEN_OFF", 0, "09:10"),
         ev("SCREEN_ON", 0, "09:00", is_keyguard_locked=True),

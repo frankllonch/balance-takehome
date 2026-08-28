@@ -1,7 +1,7 @@
 [project]
 name = "balance-takehome"
 version = "1.0.0"
-description = "Del log de eventos de un dispositivo a métricas, índice de bienestar, avisos y refuerzos."
+description = "From a device event log to metrics, a wellbeing index, alerts and reinforcements."
 requires-python = ">=3.12"
 dependencies = [
     "pandas>=2.2",
@@ -9,8 +9,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# El dashboard es un adaptador sobre `balance/`, no parte del núcleo: se puede
-# calcular todo (CLI, tests, cron) sin instalarlo.
+# The dashboard is an adapter over `balance/`, not part of the core: everything
+# (CLI, tests, cron) can be computed without installing it.
 dashboard = ["streamlit>=1.40", "plotly>=5.20"]
 dev = ["pytest>=8"]
 

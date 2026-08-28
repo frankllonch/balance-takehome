@@ -1,10 +1,10 @@
 """
-Utilidades compartidas de los tests.
+Shared test helpers.
 
-La mayoría de los tests construyen streams sintéticos a mano en vez de usar los
-ficheros de datos: un test que depende del dato real sólo dice "hoy sale esto",
-mientras que uno sintético dice "esta regla hace esto". Los ficheros reales se
-usan sólo en `test_data_contract.py`, donde el objeto del test *es* el dato.
+Most tests build synthetic streams by hand instead of using the data files: a
+test that depends on the real data only says "today this comes out", while a
+synthetic one says "this rule does this". The real files are used only in
+`test_data_contract.py`, where the data *is* the subject of the test.
 """
 
 from __future__ import annotations
@@ -18,16 +18,16 @@ from balance.events import Timeline, load
 
 DATA = Path(__file__).resolve().parents[1] / "data"
 
-#: Día base de los streams sintéticos. Cualquiera vale; se fija uno para que los
-#: tests sean deterministas y las fechas se puedan escribir a mano.
+#: Base day for synthetic streams. Any would do; one is fixed so the tests are
+#: deterministic and dates can be written by hand.
 DAY0 = dt.date(2026, 5, 1)
 
 
 def ts(day_offset: int, clock: str) -> int:
-    """`ts(0, "23:50")` → epoch millis de ese instante en el día base.
+    """`ts(0, "23:50")` → epoch millis of that instant on the base day.
 
-    El reloj del dispositivo viene normalizado a UTC (ver SCHEMA.md), así que
-    aquí se construye igual: sin zona horaria local de por medio.
+    The device clock arrives normalised to UTC, so it is built the same way
+    here: no local timezone in the middle.
     """
     h, m, *rest = (int(x) for x in clock.split(":"))
     sec = rest[0] if rest else 0
@@ -38,7 +38,7 @@ def ts(day_offset: int, clock: str) -> int:
 
 
 def ev(kind: str, day_offset: int, clock: str, **extra) -> dict:
-    """Un evento con los ocho campos del schema, los que no apliquen a None."""
+    """An event with the eight schema fields, the non-applicable ones at None."""
     base = {
         "id": 0, "event_type": kind, "timestamp_millis": ts(day_offset, clock),
         "package_name": None, "url_domain": None, "category": None,
@@ -49,10 +49,10 @@ def ev(kind: str, day_offset: int, clock: str, **extra) -> dict:
 
 
 def build(events: list[dict], user: str = "T", tmp_path: Path | None = None) -> Timeline:
-    """Construye un `Timeline` desde una lista de eventos en memoria.
+    """Builds a `Timeline` from an in-memory list of events.
 
-    Escribe un JSON temporal en vez de llamar a las funciones internas, para que
-    el test recorra exactamente el mismo camino que producción (`load`).
+    It writes a temporary JSON instead of calling the internals, so the test
+    walks exactly the same path as production (`load`).
     """
     import json
     for i, e in enumerate(events):

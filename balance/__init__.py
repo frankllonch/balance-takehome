@@ -1,19 +1,18 @@
 """
-Balance · del log de eventos de un dispositivo a decisiones de producto.
+Balance · from a device event log to product decisions.
 
-El fichero de eventos es el sistema de registro: inmutable y única fuente de
-verdad. Todo lo que hay en este paquete es dato derivado, calculado como una
-función pura y determinista de ese log.
+The event file is the system of record: immutable, the single source of truth.
+Everything in this package is derived data, computed as a pure, deterministic
+function of that log.
 
     events  →  metrics  →  score  →  intelligence
-     capa 0     capa 1     capa 2       capa 3
+     layer 0    layer 1    layer 2      layer 3
 
-Ninguna de esas cuatro capas importa Streamlit ni Plotly: `run.py` (CLI) y
-`app.py` (dashboard) son dos adaptadores sobre el mismo núcleo, y `charts.py` y
-`theme.py` son presentación pura.
+None of those four layers imports Streamlit or Plotly. `run.py` (CLI) and
+`app.py` (dashboard) are two adapters over the same core, and `charts.py` and
+`theme.py` are pure presentation.
 
-Ver `ARCHITECTURE.md` para el mapa completo y para cómo hacer los cambios más
-habituales.
+See `ARCHITECTURE.md` for the full map and for how to make the usual changes.
 """
 
 __version__ = "1.0.0"

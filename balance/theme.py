@@ -1,15 +1,17 @@
 """
-Estilo · editorial oscuro (NTS Radio), paleta Balance.
+Style · dark editorial (NTS Radio), Balance palette.
 
-Misma retícula que el dashboard OE: tipografía mono en mayúsculas, reglas duras,
-cero esquinas redondeadas, tarjetas encadenadas sin hueco. Lo que cambia es el
-plano: fondo casi negro, tinta hueso, y el bloque activo pasa de azul a hueso.
+The same grid as the reference dashboard: uppercase mono type, hard rules, no
+rounded corners anywhere, cards chained without gaps. What changes is the
+plane: near-black background, bone ink, and the active block goes from blue to
+bone.
 
-La paleta categórica son los mismos ocho tonos del tema claro, re-escalonados
-para fondo oscuro (OKLCH L 0.48–0.67, ≥3:1 sobre la superficie). Verificada con
-`validate_palette.js --mode dark --surface #121214`: banda de luminosidad OK,
-croma OK, contraste OK, peor par adyacente ΔE 10.3 → banda suelo, así que todo
-lo que use ≥4 series lleva etiqueta directa o leyenda, nunca sólo color.
+The categorical palette is the same eight hues as the light theme, re-stepped
+for a dark surface (OKLCH L 0.48 to 0.67, at least 3:1 on the surface).
+Validated with `validate_palette.js --mode dark --surface #121214`: lightness
+band OK, chroma OK, contrast OK, worst adjacent pair ΔE 10.3, which is the
+floor band, so anything using 4 or more series carries a legend or a direct
+label and never colour alone.
 """
 
 from __future__ import annotations
@@ -18,32 +20,32 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 # ---------------------------------------------------------------------------
-# Superficies y tinta
+# Surfaces and ink
 # ---------------------------------------------------------------------------
 BG = "#0a0a0b"
 PANEL = "#0f0f11"
 CARD = "#121214"
 RULE = "#2b2b31"
 RULE_SOFT = "#1e1e23"
-INK = "#f1eee8"          # hueso
+INK = "#f1eee8"          # bone
 INK_2 = "#a3a09a"
 MUTED = "#6b6862"
-ACCENT = "#e8e4da"       # bloque activo (sustituye al azul del tema claro)
+ACCENT = "#e8e4da"       # active block (replaces the light theme blue)
 GRID = "#1c1c21"
 
 # ---------------------------------------------------------------------------
-# Paleta categórica (orden fijo, nunca se cicla, nunca sigue al ranking)
+# Categorical palette (fixed order, never cycled, never follows the ranking)
 # ---------------------------------------------------------------------------
 CATEGORICAL = ["#3987e5", "#199e70", "#c98500", "#008300",
                "#9085e9", "#e66767", "#d55181", "#d95926"]
 
-#: Estado: reservado, jamás se reutiliza como "serie 4".
+#: Status: reserved, never reused as "series 4".
 GOOD = "#0ca30c"
 WARN = "#fab219"
 SERIOUS = "#ec835a"
 CRITICAL = "#e5484d"
 
-#: Color por categoría de contenido: sigue a la entidad, no a su posición.
+#: Colour per content category: follows the entity, not its position.
 CATEGORY_COLOR = {
     "SOCIAL_MEDIA":  "#3987e5",
     "MESSAGING":     "#199e70",
@@ -53,10 +55,10 @@ CATEGORY_COLOR = {
     "ADULT":         "#e66767",
     "NEWS":          "#d55181",
     "GAMBLING":      "#d95926",
-    "OTHER":         "#55555c",     # neutro a propósito: es el cajón de sastre
+    "OTHER":         "#55555c",     # deliberately neutral: it is the catch-all
 }
 
-#: Un color por usuario, estable en todo el dashboard.
+#: One colour per user, stable across the whole dashboard.
 USER_COLOR = {"A": "#199e70", "B": "#d95926"}
 
 BLOCK_TYPE_COLOR = {"APP": "#3987e5", "URL": "#c98500", "NUDITY": "#e66767"}
@@ -117,9 +119,9 @@ CSS = f"""
 
 html, body, [class*="css"], .stApp {{ font-family: {SANS} !important; }}
 
-/* El toolbar NO se puede ocultar entero: dentro vive el botón que vuelve a
-   abrir la barra lateral, así que esconderlo dejaba la barra irrecuperable una
-   vez cerrada. Se ocultan sólo las piezas que sobran (Deploy y el menú). */
+/* The toolbar can NOT be hidden wholesale: the button that reopens the sidebar
+   lives inside it, so hiding it left the sidebar unrecoverable once collapsed.
+   Only the surplus pieces are hidden (Deploy and the menu). */
 [data-testid="stAppDeployButton"], [data-testid="stAppToolbarActionButton"] {{
     display: none !important;
 }}
@@ -142,7 +144,7 @@ header[data-testid="stHeader"] {{ background: transparent !important; }}
 .stApp {{ background: var(--bg); color: var(--ink); }}
 .block-container {{ max-width: 1560px; padding-top: 2.2rem; margin: 0 auto; }}
 
-/* Titulares: editorial a la izquierda, nada redondeado */
+/* Headings: editorial, left-aligned, nothing rounded */
 h1, h2, h3, h4 {{
     color: var(--ink) !important;
     letter-spacing: -0.01em;
@@ -166,8 +168,8 @@ h3 {{
     margin-top: 1.9rem !important;
     margin-bottom: .9rem !important;
 }}
-/* Streamlit envuelve el h3 en su propio contenedor; sin esto el padding-left
-   se lo come el reset y la primera letra vuelve a pegarse a la regla. */
+/* Streamlit wraps the h3 in its own container; without this the reset eats
+   the padding-left and the first letter sticks to the rule again. */
 [data-testid="stMarkdownContainer"] h3 {{ padding-left: 1rem !important; }}
 
 * {{ border-radius: 0 !important; }}
@@ -190,7 +192,7 @@ section[data-testid="stSidebar"] label {{
     font-size: .72rem !important; color: var(--ink-2) !important;
 }}
 
-/* Tarjetas: borde duro, planas, sin sombra */
+/* Cards: hard border, flat, no shadow */
 [data-testid="stMetric"],
 [data-testid="stPlotlyChart"],
 div[data-testid="stExpander"],
@@ -205,14 +207,14 @@ div[data-testid="stExpander"],
     position: relative; z-index: 0;
 }}
 [data-testid="stPlotlyChart"] {{ padding: .4rem .6rem; }}
-/* La tira encadena las tarjetas solapándolas 1.5px, así que el borde derecho
-   de una queda por debajo de la siguiente. Al iluminarla hay que subirla de
-   capa o el resalte se ve cortado por ese lado. */
+/* The strip chains the cards by overlapping them 1.5px, so one card's right
+   border sits under the next. On hover it has to be raised a layer or the
+   highlight looks clipped on that side. */
 [data-testid="stMetric"]:hover {{ border-color: var(--accent); z-index: 3; }}
 [data-testid="stPlotlyChart"]:hover,
 div[data-testid="stExpander"]:hover {{ border-color: var(--accent); }}
 
-/* Fila de métricas: tira continua, sin huecos */
+/* Metric row: one continuous strip, no gaps */
 div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {{ gap: 0 !important; }}
 div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"])
     [data-testid="stColumn"]:not(:first-child) [data-testid="stMetric"] {{ margin-left: -1.5px; }}
@@ -235,13 +237,13 @@ div[data-testid="stHorizontalBlock"]:has([data-testid="stMetric"])
 }}
 [data-testid="stMetricDelta"] {{ font-family: var(--mono) !important; font-size: .72rem !important; }}
 
-/* Pestañas: mono en mayúsculas; la activa es un bloque hueso sólido */
+/* Tabs: uppercase mono; the active one is a solid bone block */
 div[data-testid="stTabs"] [role="tablist"] {{
     display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0;
     width: 100%; border-bottom: 1.5px solid var(--rule);
 }}
-/* Streamlit renombró la pestaña de <button> a div[data-testid="stTab"] en 1.5x;
-   se apuntan los dos para que el estilo no dependa de la versión. */
+/* Streamlit renamed the tab from <button> to div[data-testid="stTab"] in 1.5x;
+   both are targeted so the styling does not depend on the version. */
 div[data-testid="stTabs"] button,
 div[data-testid="stTabs"] [data-testid="stTab"] {{
     color: var(--ink-2) !important; font-family: var(--mono) !important;
@@ -268,14 +270,14 @@ div[data-testid="stTabs"] button[aria-selected="true"] *,
 div[data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] * {{
     color: {BG} !important; font-weight: 600 !important;
 }}
-/* el subrayado que Streamlit pinta bajo la pestaña activa sobra: el bloque
-   sólido ya marca la selección */
+/* the underline Streamlit paints under the active tab is redundant: the solid
+   block already marks the selection */
 div[data-testid="stTabs"] [role="tablist"] + div[data-rac],
 div[data-testid="stTabs"] [role="tablist"] > div[data-rac]:not([data-testid]) {{
     background: transparent !important;
 }}
 
-/* Botones e inputs */
+/* Buttons and inputs */
 .stButton > button, .stDownloadButton > button {{
     background: var(--accent) !important; color: {BG} !important;
     font-family: var(--mono) !important; text-transform: uppercase;
@@ -298,7 +300,7 @@ span[data-baseweb="tag"], span[data-baseweb="tag"] * {{ color: {BG} !important; 
     letter-spacing: .02em; font-size: .72rem !important;
 }}
 
-/* Bloque de lectura: el "so what" en prosa, con regla a la izquierda */
+/* Reading block: the "so what" in prose, with a rule on the left */
 .note {{
     border-left: 3px solid var(--accent);
     background: var(--card);
@@ -328,14 +330,14 @@ hr {{ border-color: var(--rule) !important; }}
 
 
 # ---------------------------------------------------------------------------
-# Maqueta de dispositivo
+# Device mockup
 # ---------------------------------------------------------------------------
-#: Pantallas de teléfono dibujadas en CSS, sin imágenes ni dependencias. Se usan
-#: para enseñar *lo que ve cada uno* en el mismo instante: el usuario recibe el
-#: detalle, el tutor recibe una tarjeta gruesa. La asimetría se ve de un
-#: vistazo, que es más convincente que explicarla.
-#: Rectas y sin esquinas redondeadas a propósito: es un esquema, no un
-#: skeuomorfismo, y encaja con el resto de la retícula.
+#: Phone screens drawn in CSS, with no images and no dependencies. They show
+#: *what each party sees* at the same instant: the user gets the detail, the
+#: guardian gets a coarse card. The asymmetry reads at a glance, which is more
+#: convincing than explaining it.
+#: Straight and unrounded on purpose: this is a schematic, not skeuomorphism,
+#: and it fits the rest of the grid.
 PHONE_CSS = f"""
 <style>
 .phone {{
@@ -392,8 +394,8 @@ def phone(bar_left: str, bar_right: str, inner: str) -> str:
             f'<div class="phone-body">{inner}</div></div>')
 
 
-#: Hueco cuando no hay nada que mostrar. Discreto a propósito: compite en la
-#: misma retícula que las tarjetas de teléfono, pero no en peso visual.
+#: A gap when there is nothing to show. Deliberately quiet: it competes in the
+#: same grid as the phone cards, but not in visual weight.
 CSS += """
 <style>
 .empty {

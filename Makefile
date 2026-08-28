@@ -1,22 +1,22 @@
-# Atajos. Todo funciona igual escribiendo los comandos a mano.
+# Shortcuts. Everything works the same typing the commands by hand.
 VENV := .venv/bin
 
-.PHONY: install test run dash clean
+.PHONY: install test run json csv dash clean
 
-install:            ## crea el entorno e instala todo, incluido el dashboard
+install:            ## create the environment and install everything
 	uv venv --python 3.12 .venv
 	uv pip install --python $(VENV)/python -e ".[dashboard,dev]"
 
-test:               ## 93 tests: capas 0 a 4, CLI y contrato de datos
+test:               ## 94 tests: layers 0 to 4, CLI and data contract
 	$(VENV)/python -m pytest
 
-run:                ## análisis de los dos perfiles por consola
+run:                ## console analysis of both profiles
 	$(VENV)/python -m balance.run
 
-json:               ## el mismo análisis en JSON
+json:               ## the same analysis as JSON
 	$(VENV)/python -m balance.run --format json
 
-csv:                ## vuelca los frames diario y semanal a out/
+csv:                ## dump the daily and weekly frames into out/
 	$(VENV)/python -m balance.run --csv out
 
 dash:               ## dashboard

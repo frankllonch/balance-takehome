@@ -1,8 +1,8 @@
 """
-Balance · explorador de comportamiento de dispositivo.
+Balance · device behaviour explorer.
 
-Dashboard de lectura: qué hay en los eventos, qué métricas salen de ahí, y qué
-historia cuentan los dos usuarios del mes de mayo de 2026.
+A reading dashboard: what is in the events, what metrics come out of them, and
+what story the two profiles tell over May 2026.
 
     streamlit run app.py
 """
@@ -25,7 +25,7 @@ from balance.intelligence import (
 )
 from balance.score import COMPONENTS, add_score, contributions
 
-st.set_page_config(page_title="Balance · Explorador de eventos",
+st.set_page_config(page_title="Balance · Device event explorer",
                    page_icon="◐", layout="wide",
                    initial_sidebar_state="expanded")
 theme.register_template()
@@ -34,22 +34,22 @@ st.markdown(theme.PHONE_CSS, unsafe_allow_html=True)
 
 DATA = {"A": "data/events_user_a.json", "B": "data/events_user_b.json"}
 
-#: Sólo el perfil B tiene tutor asignado. El A es un adulto: sus reglas de
-#: aviso existen igual, pero no hay destinatario al que notificar, así que sus
-#: señales sólo alimentan su propio índice y sus nudges.
+#: Only profile B has a guardian assigned. A is an adult: the alert rules run
+#: all the same, but there is no recipient to notify, so their signals only
+#: feed their own index and nudges.
 HAS_GUARDIAN = {"A": False, "B": True}
 
 
 # ---------------------------------------------------------------------------
-# Carga
+# Loading
 # ---------------------------------------------------------------------------
 
-@st.cache_data(show_spinner="Reconstruyendo sesiones desde los eventos…")
+@st.cache_data(show_spinner="Rebuilding sessions from the event log…")
 def build(user: str):
     tl = load(DATA[user], user)
     df = add_score(daily_frame(tl))
-    # los días truncados por el borde del fichero quedan fuera de TODAS las
-    # vistas, no sólo del frame diario, o los totales dejan de cuadrar.
+    # days truncated by the file edge stay out of EVERY view, not only the
+    # daily frame, or the totals stop matching.
     days = set(df["day"])
     nudges = replay_nudge(tl, df)
     positives = evaluate_positives(df, HAS_GUARDIAN[user])
@@ -85,7 +85,7 @@ F = {u: U[u]["df"] for u in DATA}
 
 
 # ---------------------------------------------------------------------------
-# Helpers de presentación
+# Presentation helpers
 # ---------------------------------------------------------------------------
 
 def note(text: str, kind: str = "") -> None:
@@ -97,27 +97,27 @@ def eyebrow(text: str) -> None:
 
 
 def empty_box(text: str) -> None:
-    """Hueco explícito. Un teléfono dibujado diciendo «no se muestra nada» es
-    una notificación que dice que no hay notificación: ocupa lo mismo y se lee
-    igual de fuerte que las que sí existen."""
+    """An explicit gap. A drawn phone saying "nothing is shown" is a
+    notification announcing there is no notification: it takes up the same room
+    and reads as loud as the ones that do exist."""
     st.markdown(f'<div class="empty">{text}</div>', unsafe_allow_html=True)
 
 
-MESES = ["ene", "feb", "mar", "abr", "may", "jun",
-         "jul", "ago", "sep", "oct", "nov", "dic"]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def fecha(d) -> str:
-    """`%b` sale en inglés salvo que se toque el locale del proceso, cosa que
-    no merece la pena hacer sólo para tres etiquetas."""
-    return f"{d.day} {MESES[d.month - 1]}"
+    """Short date. Written by hand rather than via `strftime` so the label does
+    not depend on the process locale."""
+    return f"{d.day} {MONTHS[d.month - 1]}"
 
 
 def reloj(h) -> str:
-    """Hora del eje desplazado (24 a 28 = madrugada) a HH:MM. Es None cuando no
-    hubo ninguna pantalla en la franja, que es el caso normal del usuario A."""
+    """Shifted-axis hour (24 to 28 = small hours) to HH:MM. It is None when
+    there was no screen in the band, which is user A's normal case."""
     if h is None or pd.isna(h):
-        return "sin uso"
+        return "no use"
     return f"{int(h % 24):02d}:{int(h % 1 * 60):02d}"
 
 
@@ -141,265 +141,266 @@ def wk(df: pd.DataFrame, col: str, week: int, how: str = "mean") -> float:
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.title("Balance")
-    st.caption("Explorador de eventos de dispositivo · mayo 2026")
+    st.caption("Device event explorer · May 2026")
     st.markdown("---")
-    eyebrow("Huella de datos")
+    eyebrow("Data footprint")
     for u in DATA:
         st.caption(
-            f"**Usuario {u}**: {len(U[u]['events']):,} eventos · "
-            f"{len(F[u])} días completos · {U[u]['n_intervals']} tramos de pantalla"
+            f"**User {u}**: {len(U[u]['events']):,} events · "
+            f"{len(F[u])} complete days · {U[u]['n_intervals']} screen stretches"
         )
     st.markdown("---")
-    eyebrow("Alcance de los datos")
+    eyebrow("Scope of this data")
     st.caption(
-        "Vista de dispositivo. El detalle por app, por sitio y de bloqueos no se "
-        "transmite fuera del teléfono. Lo que recibe un tutor está en "
-        "**Alertas y nudges**."
+        "This is the device-side view. Per-app, per-site and block detail is "
+        "never transmitted off the phone. What a guardian receives is in "
+        "**Alerts and nudges**."
     )
     st.markdown("---")
-    eyebrow("Notificaciones del periodo")
+    eyebrow("Notifications in the period")
     for u in DATA:
-        n = (sum(1 for x in U[u]["alerts"] if x.decision == "enviada")
+        n = (sum(1 for x in U[u]["alerts"] if x.decision == "sent")
              if HAS_GUARDIAN[u] else None)
-        st.caption(f"**Usuario {u}**: "
-                   f"{f'{n} al tutor' if n is not None else 'sin tutor'} · "
+        st.caption(f"**User {u}**: "
+                   f"{f'{n} to the guardian' if n is not None else 'no guardian'} · "
                    f"{sum(1 for x in U[u]['nudges'] if x.fired)} nudges")
 
 
-st.title("Comportamiento de dispositivo · mayo 2026")
+st.title("Device behaviour · May 2026")
 st.caption(
-    "2 perfiles · 11.488 eventos · 30 días · tiempo de pantalla, desbloqueos, "
-    "franja nocturna, categorías, bloqueos, índice de bienestar y avisos"
+    "2 profiles · 11,488 events · 30 days · screen time, unlocks, night band, "
+    "categories, blocks, wellbeing index and alerts"
 )
 
-# El selector vive en el cuerpo, no en la barra lateral: si alguien la cierra,
-# poder cambiar de perfil no debería depender de encontrar el botón de
-# reabrirla. La barra lateral se queda sólo con contexto.
+# The selector lives in the body, not the sidebar: if someone collapses it,
+# switching profile should not depend on finding the button to reopen it. The
+# sidebar keeps context only.
 _sel, _rest = st.columns([1, 4])
 with _sel:
     who = st.radio(
-        "Perfil a inspeccionar", ["A", "B"], horizontal=True, key="who",
-        help="Afecta a Ritmo diario, En qué se va el tiempo y Lo que el teléfono "
-             "paró. Panorama y La noche siempre comparan los dos.",
+        "Profile to inspect", ["A", "B"], horizontal=True, key="who",
+        help="Affects Daily rhythm, Where the time goes and What the phone "
+             "stopped. Overview and The night always compare both.",
     )
 
 TABS = st.tabs([
-    "Panorama", "Resumen semanal", "Ritmo diario", "La noche",
-    "En qué se va el tiempo", "Lo que el teléfono paró", "Alertas y nudges",
-    "Los datos",
+    "Overview", "Weekly summary", "Daily rhythm", "The night",
+    "Where the time goes", "What the phone stopped", "Alerts and nudges",
+    "The data",
 ])
 
 
 # ===========================================================================
-# 1 · PANORAMA
+# 1 · OVERVIEW
 # ===========================================================================
 with TABS[0]:
     a, b = F["A"], F["B"]
 
-    st.markdown("### Perfiles")
+    st.markdown("### Profiles")
     note(
-        f"Los dos ficheros corresponden a perfiles distintos y requieren "
-        f"configuraciones distintas.<br><br>"
-        f"<b>Usuario A</b> · adulto sin tutor. {hm(a.screen_min.mean())} de "
-        f"pantalla al día, {a.pickups.mean():.0f} desbloqueos, "
-        f"{a.distinct_apps.mean():.0f} apps. Sin uso nocturno y sin contenido "
-        f"sensible en los 30 días.<br>"
-        f"<b>Usuario B</b> · menor con tutor. {hm(b.screen_min.mean())}, "
-        f"{b.pickups.mean():.0f} desbloqueos, {b.distinct_apps.mean():.0f} apps. "
-        f"{b.blocks.sum():,.0f} intentos bloqueados, de los que "
-        f"{b.blocks_sensitive.sum():.0f} son <code>ADULT</code> o "
-        f"<code>GAMBLING</code>. Catálogo compatible con menor: Duolingo y Kindle "
-        f"en uso diario, Roblox y Clash of Clans bloqueados 73 y 71 veces."
+        f"The two files are different kinds of profile and need different "
+        f"configurations.<br><br>"
+        f"<b>User A</b> · adult, no guardian. {hm(a.screen_min.mean())} of screen "
+        f"per day, {a.pickups.mean():.0f} unlocks, {a.distinct_apps.mean():.0f} "
+        f"apps. No night-band use and no sensitive content across the 30 days."
+        f"<br>"
+        f"<b>User B</b> · minor with a guardian. {hm(b.screen_min.mean())}, "
+        f"{b.pickups.mean():.0f} unlocks, {b.distinct_apps.mean():.0f} apps. "
+        f"{b.blocks.sum():,.0f} blocked attempts, of which "
+        f"{b.blocks_sensitive.sum():.0f} are <code>ADULT</code> or "
+        f"<code>GAMBLING</code>. App catalogue consistent with a minor: Duolingo "
+        f"and Kindle in daily use, Roblox and Clash of Clans blocked 73 and 71 "
+        f"times."
     )
 
     c1, c2 = st.columns(2)
     for col, u in ((c1, "A"), (c2, "B")):
         d = F[u]
         with col:
-            eyebrow(f"Usuario {u} · índice de bienestar")
+            eyebrow(f"User {u} · wellbeing index")
             st.markdown(
                 f"<div style='font-family:{theme.MONO};font-size:3.4rem;"
                 f"line-height:1;color:{theme.USER_COLOR[u]};font-weight:600'>"
                 f"{d.score.mean():.0f}<span style='font-size:1.1rem;color:{theme.MUTED}'>"
                 f" /100</span></div>"
                 f"<div class='eyebrow' style='margin-top:.35rem'>"
-                f"semana 1 → {wk(d,'score',1):.0f} &nbsp;·&nbsp; última semana completa → "
+                f"week 1 → {wk(d,'score',1):.0f} &nbsp;·&nbsp; last full week → "
                 f"{wk(d,'score',4):.0f}</div>",
                 unsafe_allow_html=True)
 
     st.markdown("")
     kpis([
-        ("A · pantalla/día", hm(a.screen_min.mean()), None),
-        ("A · desbloqueos/día", f"{a.pickups.mean():.0f}", None),
-        ("A · madrugada/día", f"{a.night_min.mean():.0f} min", None),
-        ("A · bloqueos/mes", f"{a.blocks.sum():.0f}", None),
-        ("A · sensibles", f"{a.blocks_sensitive.sum():.0f}", None),
+        ("A · screen/day", hm(a.screen_min.mean()), None),
+        ("A · unlocks/day", f"{a.pickups.mean():.0f}", None),
+        ("A · late night/day", f"{a.night_min.mean():.0f} min", None),
+        ("A · blocks/month", f"{a.blocks.sum():.0f}", None),
+        ("A · sensitive", f"{a.blocks_sensitive.sum():.0f}", None),
     ])
     kpis([
-        ("B · pantalla/día", hm(b.screen_min.mean()), None),
-        ("B · desbloqueos/día", f"{b.pickups.mean():.0f}", None),
-        ("B · madrugada/día", f"{b.night_min.mean():.0f} min", None),
-        ("B · bloqueos/mes", f"{b.blocks.sum():,.0f}", None),
-        ("B · sensibles", f"{b.blocks_sensitive.sum():.0f}", None),
+        ("B · screen/day", hm(b.screen_min.mean()), None),
+        ("B · unlocks/day", f"{b.pickups.mean():.0f}", None),
+        ("B · late night/day", f"{b.night_min.mean():.0f} min", None),
+        ("B · blocks/month", f"{b.blocks.sum():,.0f}", None),
+        ("B · sensitive", f"{b.blocks_sensitive.sum():.0f}", None),
     ])
 
-    st.markdown("### Índice de bienestar")
+    st.markdown("### Wellbeing index")
     st.plotly_chart(charts.score_line(F), width="stretch", key="k_score")
     note(
-        f"<b>A</b> se mantiene en {a.score.mean():.0f} las cuatro semanas "
-        f"(rango {a.score.min():.0f} a {a.score.max():.0f}); sin cambio de "
-        f"tendencia.<br>"
-        f"<b>B</b> pasa de {wk(b,'score',1):.0f} a {wk(b,'score',4):.0f}, "
-        f"{wk(b,'score',1)-wk(b,'score',4):.0f} puntos en tres semanas. La caída "
-        f"viene casi entera del componente nocturno: su puntuación de noche baja "
-        f"de {wk(b,'score_night_min',1):.0f} a {wk(b,'score_night_min',4):.0f} "
-        f"mientras el resto de componentes se mueve menos de 10 puntos. Detalle "
-        f"en «La noche».",
+        f"<b>A</b> holds at {a.score.mean():.0f} across the four weeks "
+        f"(range {a.score.min():.0f} to {a.score.max():.0f}), with no change of "
+        f"trend.<br>"
+        f"<b>B</b> goes from {wk(b,'score',1):.0f} to {wk(b,'score',4):.0f}, "
+        f"{wk(b,'score',1)-wk(b,'score',4):.0f} points in three weeks. The drop "
+        f"comes almost entirely from the night component: their night score falls "
+        f"from {wk(b,'score_night_min',1):.0f} to "
+        f"{wk(b,'score_night_min',4):.0f} while every other component moves less "
+        f"than 10 points. Detail in \"The night\".",
         "warn")
 
-    st.markdown("### Lo que se mueve y lo que no")
+    st.markdown("### What moves and what does not")
     g1, g2 = st.columns(2)
     with g1:
         st.plotly_chart(charts.compare_line(F, "screen_min",
-                        "Tiempo de pantalla al día", "minutos"),
+                        "Screen time per day", "minutes"),
                         width="stretch", key="k_screen")
         st.plotly_chart(charts.compare_line(F, "pickups",
-                        "Desbloqueos reales al día", "desbloqueos"),
+                        "Real unlocks per day", "unlocks"),
                         width="stretch", key="k_pickups")
     with g2:
         st.plotly_chart(charts.compare_line(F, "night_min",
-                        "Minutos de pantalla de madrugada", "minutos"),
+                        "Late-night screen minutes", "minutes"),
                         width="stretch", key="k_night")
         st.plotly_chart(charts.compare_line(F, "blocks",
-                        "Intentos bloqueados al día", "bloqueos"),
+                        "Blocked attempts per day", "blocks"),
                         width="stretch", key="k_blocks")
 
     d_screen = (wk(b, "screen_min", 4) / wk(b, "screen_min", 1) - 1) * 100
     d_pick = (wk(b, "pickups", 4) / wk(b, "pickups", 1) - 1) * 100
     d_night = wk(b, "night_min", 4) / max(wk(b, "night_min", 1), .01)
-    st.markdown("### Variación de B entre la semana 1 y la 4")
+    st.markdown("### User B, week 1 against week 4")
     st.dataframe(pd.DataFrame([
-        ("Pantalla al día", f"{wk(b,'screen_min',1):.0f} min",
+        ("Screen per day", f"{wk(b,'screen_min',1):.0f} min",
          f"{wk(b,'screen_min',4):.0f} min", f"{d_screen:+.0f} %"),
-        ("Desbloqueos al día", f"{wk(b,'pickups',1):.0f}",
+        ("Unlocks per day", f"{wk(b,'pickups',1):.0f}",
          f"{wk(b,'pickups',4):.0f}", f"{d_pick:+.0f} %"),
-        ("Minutos de madrugada", f"{wk(b,'night_min',1):.1f} min",
+        ("Late-night minutes", f"{wk(b,'night_min',1):.1f} min",
          f"{wk(b,'night_min',4):.0f} min", f"×{d_night:.0f}"),
-        ("Desbloqueos tras medianoche", f"{wk(b,'night_pickups',1):.1f}",
+        ("Unlocks after midnight", f"{wk(b,'night_pickups',1):.1f}",
          f"{wk(b,'night_pickups',4):.1f}",
          f"×{wk(b,'night_pickups',4)/max(wk(b,'night_pickups',1),.01):.0f}"),
-        ("Bloqueos al día", f"{wk(b,'blocks',1):.0f}",
+        ("Blocks per day", f"{wk(b,'blocks',1):.0f}",
          f"{wk(b,'blocks',4):.0f}",
          f"{(wk(b,'blocks',4)/wk(b,'blocks',1)-1)*100:+.0f} %"),
-    ], columns=["Métrica", "Semana 1", "Semana 4", "Variación"]),
+    ], columns=["Metric", "Week 1", "Week 4", "Change"]),
         width="stretch", hide_index=True)
     note(
-        f"El volumen apenas se mueve ({d_screen:+.0f} % de pantalla, "
-        f"{d_pick:+.0f} % de desbloqueos) y el horario nocturno se multiplica por "
-        f"{d_night:.0f}. Un umbral sobre tiempo de pantalla no habría detectado "
-        f"este caso: la detección va sobre la franja nocturna, no sobre el total "
-        f"(ver «Alertas y nudges»).",
+        f"Volume barely moves ({d_screen:+.0f} % of screen time, "
+        f"{d_pick:+.0f} % of unlocks) while the night band multiplies by "
+        f"{d_night:.0f}. A threshold on screen time would not have caught this "
+        f"case: detection runs on the night band, not on the total (see "
+        f"\"Alerts and nudges\").",
         "serious")
 
 # ===========================================================================
-# 2 · RESUMEN SEMANAL
+# 2 · WEEKLY SUMMARY
 # ===========================================================================
 with TABS[1]:
     d = F[who]
     w = U[who]["weekly"]
-    st.markdown(f"### Usuario {who} · resumen por semana")
+    st.markdown(f"### User {who} · week by week")
 
     weeks = list(w.index)
     sel = st.select_slider(
-        "Semana", options=weeks, value=weeks[-2] if len(weeks) > 1 else weeks[-1],
-        format_func=lambda i: (f"Semana {i}"
-                               + (" (parcial)" if w.loc[i, "is_partial"] else "")),
+        "Week", options=weeks, value=weeks[-2] if len(weeks) > 1 else weeks[-1],
+        format_func=lambda i: (f"Week {i}"
+                               + (" (short)" if w.loc[i, "is_partial"] else "")),
         key=f"week_{who}")
     cur = w.loc[sel]
     prev = w.loc[sel - 1] if sel - 1 in w.index else None
 
     st.caption(
-        f"Del {fecha(cur['start'])} al {fecha(cur['end'])} · {int(cur['days'])} "
-        f"días" + ("  ·  semana incompleta: las medias son por día, pero la "
-                   "comparación con semanas de siete días es menos fiable."
+        f"{fecha(cur['start'])} to {fecha(cur['end'])} · {int(cur['days'])} "
+        f"days" + ("  ·  short week: the averages are per day, but comparing it "
+                   "against seven-day weeks is less reliable."
                    if cur["is_partial"] else "")
     )
 
     def delta(col, unit="", dec=0):
-        """Variación frente a la semana anterior, en la unidad de la métrica.
+        """Change against the previous week, in the metric's own unit.
 
-        Una variación que redondea a cero no se muestra: «+0 min» con flecha
-        verde dice que algo ha mejorado cuando no se ha movido nada.
+        A change that rounds to zero is not shown: "+0 min" with a green arrow
+        says something improved when nothing moved.
         """
         if prev is None or pd.isna(prev[col]):
             return None
         v = cur[col] - prev[col]
         if abs(round(v, dec)) < 10 ** -dec / 2 or f"{v:.{dec}f}".strip("-+") in ("0", "0.0"):
-            return "sin cambio"
+            return "no change"
         return f"{v:+.{dec}f} {unit}".strip()
 
     kpis([
-        ("Pantalla / día", hm(cur["screen_min"]), delta("screen_min", "min")),
-        ("Desbloqueos / día", f"{cur['pickups']:.0f}", delta("pickups")),
-        ("Madrugada / noche", f"{cur['night_min']:.0f} min",
+        ("Screen / day", hm(cur["screen_min"]), delta("screen_min", "min")),
+        ("Unlocks / day", f"{cur['pickups']:.0f}", delta("pickups")),
+        ("Late night / night", f"{cur['night_min']:.0f} min",
          delta("night_min", "min")),
-        ("Desconexión más larga", f"{cur['longest_offline_h']:.1f} h",
+        ("Longest disconnection", f"{cur['longest_offline_h']:.1f} h",
          delta("longest_offline_h", "h", dec=1)),
-        ("Mejor racha de la semana", f"{cur['best_offline_h']:.1f} h",
+        ("Best stretch this week", f"{cur['best_offline_h']:.1f} h",
          cur["best_offline_when"]),
-        ("Bloqueos / día", f"{cur['blocks']:.1f}", delta("blocks", dec=1)),
-        ("Índice", f"{cur['score']:.0f}", delta("score", dec=0)),
+        ("Blocks / day", f"{cur['blocks']:.1f}", delta("blocks", dec=1)),
+        ("Index", f"{cur['score']:.0f}", delta("score", dec=0)),
     ])
 
     st.markdown("")
     g1, g2 = st.columns(2)
     with g1:
         st.plotly_chart(charts.week_evolution(
-            w, "screen_min", "Pantalla al día, por semana", "min", who, sel),
+            w, "screen_min", "Screen per day, by week", "min", who, sel),
             width="stretch", key=f"we_screen_{who}")
         st.plotly_chart(charts.week_evolution(
-            w, "night_min", "Madrugada por noche, por semana", "min", who, sel),
+            w, "night_min", "Late night per night, by week", "min", who, sel),
             width="stretch", key=f"we_night_{who}")
     with g2:
         st.plotly_chart(charts.week_evolution(
-            w, "pickups", "Desbloqueos al día, por semana", "", who, sel),
+            w, "pickups", "Unlocks per day, by week", "", who, sel),
             width="stretch", key=f"we_pick_{who}")
         st.plotly_chart(charts.week_evolution(
-            w, "blocks", "Bloqueos al día, por semana", "", who, sel),
+            w, "blocks", "Blocks per day, by week", "", who, sel),
             width="stretch", key=f"we_blocks_{who}")
-    st.caption("Las semanas marcadas con * no llegan a siete días.")
+    st.caption("Weeks marked with * are shorter than seven days.")
 
     st.plotly_chart(charts.week_components(w, sel), width="stretch",
                     key=f"we_comp_{who}")
 
-    st.markdown(f"#### Los días de la semana {sel}")
+    st.markdown(f"#### The days of week {sel}")
     c1, c2 = st.columns(2)
     with c1:
         st.plotly_chart(charts.week_days(
-            d, sel, "screen_min", f"Pantalla al día · semana {sel}", "min", who),
+            d, sel, "screen_min", f"Screen per day · week {sel}", "min", who),
             width="stretch", key=f"wd_screen_{who}")
     with c2:
         st.plotly_chart(charts.week_days(
-            d, sel, "night_min", f"Madrugada por noche · semana {sel}", "min", who),
+            d, sel, "night_min", f"Late night per night · week {sel}", "min", who),
             width="stretch", key=f"wd_night_{who}")
 
-    st.markdown("#### Comparación con el resto del periodo")
+    st.markdown("#### Against the rest of the period")
     rows = [
-        ("Pantalla al día", "screen_min", "min", 0),
-        ("Desbloqueos al día", "pickups", "", 0),
-        ("Madrugada por noche", "night_min", "min", 0),
-        ("Desconexión más larga", "longest_offline_h", "h", 1),
-        ("Apps distintas al día", "distinct_apps", "", 1),
-        ("Cambios de app por hora", "switches_per_screen_hour", "", 0),
-        ("Cuota de distracción", "distract_share", "%", 0),
-        ("Bloqueos al día", "blocks", "", 1),
-        ("Índice", "score", "", 0),
+        ("Screen per day", "screen_min", "min", 0),
+        ("Unlocks per day", "pickups", "", 0),
+        ("Late night per night", "night_min", "min", 0),
+        ("Longest disconnection", "longest_offline_h", "h", 1),
+        ("Distinct apps per day", "distinct_apps", "", 1),
+        ("App switches per hour", "switches_per_screen_hour", "", 0),
+        ("Distraction share", "distract_share", "%", 0),
+        ("Blocks per day", "blocks", "", 1),
+        ("Index", "score", "", 0),
     ]
     tbl = []
     for label, col, unit, dec in rows:
         mult = 100 if unit == "%" else 1
-        # Se redondea ANTES de restar: si no, la variación no cuadra con las
-        # dos columnas que tiene al lado y parece un error de cálculo.
+        # Rounded BEFORE subtracting: otherwise the change does not match the
+        # two columns beside it and looks like an arithmetic error.
         v = round(cur[col] * mult, dec)
         pv = (round(prev[col] * mult, dec)
               if prev is not None and not pd.isna(prev[col]) else None)
@@ -407,35 +408,35 @@ with TABS[1]:
         if pv is None:
             var = "n/a"
         elif abs(v - pv) < 10 ** -dec / 2:
-            var = "sin cambio"
+            var = "no change"
         else:
             var = f"{v - pv:+.{dec}f} {unit}".strip()
         tbl.append({
-            "Métrica": label,
-            f"Semana {sel}": f"{v:.{dec}f} {unit}".strip(),
-            "Semana anterior": (f"{pv:.{dec}f} {unit}".strip()
-                                if pv is not None else "n/a"),
-            "Mediana del periodo": f"{med:.{dec}f} {unit}".strip(),
-            "Variación": var,
+            "Metric": label,
+            f"Week {sel}": f"{v:.{dec}f} {unit}".strip(),
+            "Previous week": (f"{pv:.{dec}f} {unit}".strip()
+                              if pv is not None else "n/a"),
+            "Period median": f"{med:.{dec}f} {unit}".strip(),
+            "Change": var,
         })
     st.dataframe(pd.DataFrame(tbl), width="stretch", hide_index=True)
 
-    st.markdown(f"#### Lo que el teléfono emitió en la semana {sel}")
+    st.markdown(f"#### What the phone emitted in week {sel}")
     wk_days = set(d[d["week"] == sel]["day"])
     wk_em = [e for e in U[who]["emissions"] if e["day"] in wk_days]
     resumen = [x for x in U[who]["positives"]
-               if x.decision == "resumen" and x.day in wk_days]
+               if x.decision == "summary" and x.day in wk_days]
 
     if wk_em:
         st.dataframe(pd.DataFrame([{
-            "Fecha": fecha(e["day"]), "Destino": e["destino"],
-            "Tipo": e["tipo"], "Detalle": e["detalle"],
+            "Date": fecha(e["day"]), "Destination": e["destination"],
+            "Type": e["type"], "Detail": e["detail"],
         } for e in wk_em]), width="stretch", hide_index=True)
     else:
-        st.caption("Ninguna notificación ni nudge en esta semana.")
+        st.caption("No notification and no nudge this week.")
 
     if resumen:
-        st.markdown("**También registrado esta semana, sin notificar**")
+        st.markdown("**Also recorded this week, not notified**")
         for x in resumen:
             st.markdown(
                 f"<div class='phone-row'><span>{x.headline}</span>"
@@ -444,28 +445,28 @@ with TABS[1]:
 
 
 # ===========================================================================
-# 3 · RITMO DIARIO
+# 3 · DAILY RHYTHM
 # ===========================================================================
 with TABS[2]:
     d = F[who]
-    st.markdown(f"### Usuario {who} · resumen del mes")
+    st.markdown(f"### User {who} · month at a glance")
 
     best = d.loc[d.score.idxmax()]
     worst = d.loc[d.score.idxmin()]
     kpis([
-        ("Pantalla / día", hm(d.screen_min.mean()),
+        ("Screen / day", hm(d.screen_min.mean()),
          f"±{d.screen_min.std():.0f} min"),
-        ("Sesiones / día", f"{d.sessions.mean():.0f}",
-         f"mediana {d.median_session_s.mean()/60:.1f} min"),
-        ("Desbloqueos reales", f"{d.pickups.mean():.0f}",
-         f"{d.glances.mean():.0f} vistazos"),
-        ("Primer desbloqueo", d.first_pickup_clock.mode().iloc[0],
-         f"mediana {d.first_pickup_h.median():.1f} h"),
-        ("Desconexión más larga", f"{d.longest_offline_s.mean()/3600:.1f} h",
-         f"mejor: {d.longest_offline_h.max():.1f} h "
+        ("Sessions / day", f"{d.sessions.mean():.0f}",
+         f"median {d.median_session_s.mean()/60:.1f} min"),
+        ("Real unlocks", f"{d.pickups.mean():.0f}",
+         f"{d.glances.mean():.0f} glances"),
+        ("First unlock", d.first_pickup_clock.mode().iloc[0],
+         f"median {d.first_pickup_h.median():.1f} h"),
+        ("Longest disconnection", f"{d.longest_offline_s.mean()/3600:.1f} h",
+         f"best: {d.longest_offline_h.max():.1f} h on "
          f"{d.loc[d.longest_offline_h.idxmax(), 'longest_offline_when']}"),
-        ("Cambios de app / h", f"{d.switches_per_screen_hour.mean():.0f}",
-         f"{d.distinct_apps.mean():.0f} apps distintas"),
+        ("App switches / h", f"{d.switches_per_screen_hour.mean():.0f}",
+         f"{d.distinct_apps.mean():.0f} distinct apps"),
     ])
 
     st.markdown("")
@@ -473,17 +474,17 @@ with TABS[2]:
     with c1:
         st.plotly_chart(charts.daily_bars_vs_baseline(
             d, "screen_min", "screen_min_baseline",
-            f"Usuario {who} · pantalla al día", "minutos", who),
+            f"User {who} · screen per day", "minutes", who),
             width="stretch", key="k_bar_screen")
     with c2:
         st.plotly_chart(charts.daily_bars_vs_baseline(
             d, "pickups", "pickups_baseline",
-            f"Usuario {who} · desbloqueos al día",
-            "desbloqueos", who), width="stretch", key="k_bar_pickups")
+            f"User {who} · unlocks per day",
+            "unlocks", who), width="stretch", key="k_bar_pickups")
     st.caption(
-        "Referencia: mediana de los 14 días anteriores del mismo usuario. Los 14 "
-        "primeros días del periodo no tienen historial suficiente y se muestran "
-        "sin comparar."
+        "Reference: median of the same user's previous 14 days. The first 14 "
+        "days of the period have no history to compare against and are shown "
+        "uncompared."
     )
 
     c3, c4 = st.columns(2)
@@ -497,40 +498,40 @@ with TABS[2]:
     diff = wknd.loc[True, "screen_min"] - wknd.loc[False, "screen_min"]
     if who == "A":
         note(
-            f"<b>Rutina estable.</b> Primer desbloqueo entre las 07:30 y las 09:00, "
-            f"última pantalla sobre las {d.last_use_clock.mode().iloc[0]}, sin "
-            f"actividad después de las 23:00 en ningún día del periodo.<br><br>"
-            f"<b>Uso laboral.</b> El fin de semana baja a "
-            f"{wknd.loc[True,'screen_min']:.0f} min frente a "
-            f"{wknd.loc[False,'screen_min']:.0f} entre semana "
-            f"({abs(diff):.0f} min menos), con "
-            f"{wknd.loc[False,'pickups']-wknd.loc[True,'pickups']:.0f} desbloqueos "
-            f"menos.<br><br>"
-            f"<b>Sesiones cortas y limpias.</b> Mediana de "
-            f"{d.median_session_s.mean()/60:.1f} min y "
-            f"{d.switches_per_screen_hour.mean():.0f} cambios de app por hora de "
-            f"pantalla, sobre {d.distinct_apps.mean():.0f} apps distintas al día. "
-            f"No requiere intervención.",
+            f"<b>Stable routine.</b> First unlock between 07:30 and 09:00, last "
+            f"screen around {d.last_use_clock.mode().iloc[0]}, no activity after "
+            f"23:00 on any day of the period.<br><br>"
+            f"<b>Work-shaped use.</b> Weekends drop to "
+            f"{wknd.loc[True,'screen_min']:.0f} min against "
+            f"{wknd.loc[False,'screen_min']:.0f} on weekdays "
+            f"({abs(diff):.0f} min less), with "
+            f"{wknd.loc[False,'pickups']-wknd.loc[True,'pickups']:.0f} fewer "
+            f"unlocks.<br><br>"
+            f"<b>Short, clean sessions.</b> Median of "
+            f"{d.median_session_s.mean()/60:.1f} min and "
+            f"{d.switches_per_screen_hour.mean():.0f} app switches per screen "
+            f"hour, over {d.distinct_apps.mean():.0f} distinct apps a day. No "
+            f"intervention needed.",
             "good")
     else:
         note(
-            f"<b>Sin corte de fin de semana.</b> "
-            f"{wknd.loc[True,'screen_min']:.0f} min en fin de semana frente a "
-            f"{wknd.loc[False,'screen_min']:.0f} entre semana ({diff:+.0f}). "
-            f"El uso está repartido de 08:00 a 00:00 los siete días, con la banda "
-            f"de medianoche ganando peso a lo largo del mes.<br><br>"
-            f"<b>Uso fragmentado.</b> Sesiones de "
-            f"{d.median_session_s.mean()/60:.1f} min de mediana pero "
-            f"{d.switches_per_screen_hour.mean():.0f} cambios de app por hora, "
+            f"<b>No weekend break.</b> "
+            f"{wknd.loc[True,'screen_min']:.0f} min at weekends against "
+            f"{wknd.loc[False,'screen_min']:.0f} on weekdays ({diff:+.0f}). Use "
+            f"spreads from 08:00 to 00:00 all seven days, with the midnight band "
+            f"gaining weight through the month.<br><br>"
+            f"<b>Fragmented use.</b> Sessions of "
+            f"{d.median_session_s.mean()/60:.1f} min median but "
+            f"{d.switches_per_screen_hour.mean():.0f} app switches per hour, "
             f"{d.switches_per_screen_hour.mean()/F['A'].switches_per_screen_hour.mean():.1f}× "
-            f"la tasa del usuario A. El patrón es de consulta frecuente, no de "
-            f"sesiones largas.<br><br>"
-            f"<b>Franja nocturna activa.</b> {d.night_min.mean():.0f} min de media "
-            f"entre las 23:00 y las 06:00, con tendencia creciente. Es el punto "
-            f"que ha generado el aviso al tutor.",
+            f"user A's rate. The pattern is frequent checking, not long "
+            f"sessions.<br><br>"
+            f"<b>Active night band.</b> {d.night_min.mean():.0f} min on average "
+            f"between 23:00 and 06:00, and rising. This is what generated the "
+            f"guardian alert.",
             "warn")
 
-    with st.expander("Ver la tabla diaria completa"):
+    with st.expander("See the full daily table"):
         cols = ["day", "score", "screen_min", "pickups", "glances", "sessions",
                 "night_min", "night_pickups", "first_pickup_clock",
                 "last_use_clock", "longest_offline_s", "longest_offline_when",
@@ -540,17 +541,17 @@ with TABS[2]:
         show["longest_offline_s"] = (show["longest_offline_s"] / 3600).round(1)
         show = show.rename(columns={"longest_offline_s": "offline_max_h"})
         st.dataframe(show.round(1), width="stretch", hide_index=True)
-        st.download_button("Descargar CSV",
+        st.download_button("Download CSV",
                            d.drop(columns=["_cat_s", "_app_s", "_site_s"]).to_csv(index=False),
                            file_name=f"balance_daily_{who}.csv", mime="text/csv")
 
 
 # ===========================================================================
-# 4 · LA NOCHE
+# 4 · THE NIGHT
 # ===========================================================================
 with TABS[3]:
     b = F["B"]
-    st.markdown("### Franja nocturna · usuario B")
+    st.markdown("### Night band · user B")
 
     n1, n4 = wk(b, "night_min", 1), wk(b, "night_min", 4)
     e1, e4 = wk(b, "night_end_h", 1), wk(b, "night_end_h", 4)
@@ -559,33 +560,33 @@ with TABS[3]:
     sleep4 = (24 + f4) - e4
 
     kpis([
-        ("B · madrugada sem. 1", f"{n1:.0f} min", None),
-        ("B · madrugada sem. 4", f"{n4:.0f} min", f"×{n4/max(n1,.01):.0f}"),
-        ("B · última pantalla sem. 1", f"{int(e1%24):02d}:{int(e1%1*60):02d}", None),
-        ("B · última pantalla sem. 4", f"{int(e4%24):02d}:{int(e4%1*60):02d}",
+        ("B · late night wk 1", f"{n1:.0f} min", None),
+        ("B · late night wk 4", f"{n4:.0f} min", f"×{n4/max(n1,.01):.0f}"),
+        ("B · last screen wk 1", f"{int(e1%24):02d}:{int(e1%1*60):02d}", None),
+        ("B · last screen wk 4", f"{int(e4%24):02d}:{int(e4%1*60):02d}",
          f"{(e4-e1)*60:+.0f} min"),
-        ("B · primer desbloqueo", f"{int(f4):02d}:{int(f4%1*60):02d}",
+        ("B · first unlock", f"{int(f4):02d}:{int(f4%1*60):02d}",
          f"{(f4-f1)*60:+.0f} min"),
-        ("B · ventana de sueño", f"{sleep4:.1f} h", f"{(sleep4-sleep1)*60:+.0f} min"),
+        ("B · sleep window", f"{sleep4:.1f} h", f"{(sleep4-sleep1)*60:+.0f} min"),
     ])
 
     st.markdown("")
     st.plotly_chart(charts.night_drift(F), width="stretch", key="k_nightdrift")
 
     note(
-        f"<b>La hora de acostarse se retrasa; la de levantarse no.</b><br><br>"
-        f"Última pantalla: {int(e1%24):02d}:{int(e1%1*60):02d} en la semana 1, "
-        f"{int(e4%24):02d}:{int(e4%1*60):02d} en la semana 4 "
-        f"({(e4-e1)*60:.0f} min más tarde).<br>"
-        f"Primer desbloqueo: {int(f1):02d}:{int(f1%1*60):02d} → "
+        f"<b>Bedtime slides later; wake-up time does not.</b><br><br>"
+        f"Last screen: {int(e1%24):02d}:{int(e1%1*60):02d} in week 1, "
+        f"{int(e4%24):02d}:{int(e4%1*60):02d} in week 4 "
+        f"({(e4-e1)*60:.0f} min later).<br>"
+        f"First unlock: {int(f1):02d}:{int(f1%1*60):02d} → "
         f"{int(f4):02d}:{int(f4%1*60):02d} ({(f4-f1)*60:+.0f} min).<br>"
-        f"Ventana entre ambos: {sleep1:.1f} h → {sleep4:.1f} h, "
-        f"<b>{abs(sleep4-sleep1)*60:.0f} min menos de descanso disponible por "
-        f"noche</b>.<br><br>"
-        f"Los desbloqueos después de medianoche pasan de "
-        f"{wk(b,'night_pickups',1):.1f} a {wk(b,'night_pickups',4):.1f} por noche. "
-        f"No es un día suelto que se alarga: son "
-        f"{wk(b,'night_pickups',4):.0f} vueltas al teléfono cada madrugada.",
+        f"Window between the two: {sleep1:.1f} h → {sleep4:.1f} h, "
+        f"<b>{abs(sleep4-sleep1)*60:.0f} min less rest available per "
+        f"night</b>.<br><br>"
+        f"Unlocks after midnight go from {wk(b,'night_pickups',1):.1f} to "
+        f"{wk(b,'night_pickups',4):.1f} per night. This is not one day running "
+        f"long: it is {wk(b,'night_pickups',4):.0f} returns to the phone every "
+        f"night.",
         "serious")
 
     c1, c2 = st.columns(2)
@@ -593,180 +594,178 @@ with TABS[3]:
         st.plotly_chart(charts.day_span(b, "B"), width="stretch", key="k_span_night")
     with c2:
         st.plotly_chart(charts.compare_line(F, "night_pickups",
-                        "Desbloqueos después de medianoche", "desbloqueos", 5),
+                        "Unlocks after midnight", "unlocks", 5),
                         width="stretch", key="k_nightpick")
 
     note(
-        f"<b>Usuario A, mismo periodo:</b> 0,0 min de pantalla entre las 23:00 y "
-        f"las 06:00 en los 30 días. Última pantalla a las "
+        f"<b>User A, same period:</b> 0.0 min of screen between 23:00 and 06:00 "
+        f"across all 30 days. Last screen at "
         f"{int(F['A'].last_use_h.mean()):02d}:"
-        f"{int(F['A'].last_use_h.mean()%1*60):02d} de media, sin reaperturas "
-        f"posteriores. El corte de las 23:00 no penaliza a todos los perfiles por "
-        f"igual: A lo respeta sin intervención del producto.",
+        f"{int(F['A'].last_use_h.mean()%1*60):02d} on average, with no reopenings "
+        f"after that. The 23:00 cut does not penalise every profile equally: A "
+        f"respects it with no product intervention at all.",
         "good")
 
-    st.markdown("### Peso de la noche en el índice")
+    st.markdown("### Why the night carries 20 % of the index")
     note(
-        f"La franja nocturna pesa un 20 % del índice, lo mismo que la "
-        f"fragmentación y más que la desconexión larga, pese a ser la métrica más "
-        f"pequeña en valor absoluto ({b.night_min.mean():.0f} min de media frente "
-        f"a {b.screen_min.mean():.0f} de pantalla total).<br><br>"
-        f"El criterio: una hora de pantalla a la 01:00 sale del descanso y una "
-        f"hora a las 17:00 no, y el margen de mejora es mucho más accesible. "
-        f"Reducir dos horas de uso diario implica cambiar la rutina completa; "
-        f"adelantar la última pantalla 40 minutos es un solo cambio."
+        f"The night band carries 20 % of the index, the same as fragmentation "
+        f"and more than long disconnection, despite being the smallest metric in "
+        f"absolute terms ({b.night_min.mean():.0f} min on average against "
+        f"{b.screen_min.mean():.0f} of total screen time).<br><br>"
+        f"The reasoning: an hour of screen at 01:00 comes out of rest and an "
+        f"hour at 17:00 does not, and the room for improvement is far more "
+        f"reachable. Cutting two hours of daily use means changing a whole "
+        f"routine; moving the last screen 40 minutes earlier is one change."
     )
 
 # ===========================================================================
-# 5 · EN QUÉ SE VA EL TIEMPO
+# 5 · WHERE THE TIME GOES
 # ===========================================================================
 with TABS[4]:
     d = F[who]
     apps, sites = U[who]["apps"], U[who]["sites"]
-    st.markdown(f"### Usuario {who} · reparto del tiempo")
+    st.markdown(f"### User {who} · how the time splits")
 
     st.markdown(
-        '<span class="tag">sólo en el dispositivo</span>'
-        '<span class="tag">nunca se envía al tutor</span>',
+        '<span class="tag">device only</span>'
+        '<span class="tag">never sent to a guardian</span>',
         unsafe_allow_html=True)
 
     top_share = apps.minutes.head(3).sum() / apps.minutes.sum() * 100
     kpis([
-        ("Tiempo atribuido", f"{U[who]['attributed_h']:.0f} h",
-         f"{U[who]['attributed_h']/U[who]['screen_h']*100:.0f} % de la pantalla"),
-        ("Apps distintas", f"{len(apps)}", "en todo el mes"),
-        ("Dominios distintos", f"{len(sites)}", "en todo el mes"),
-        ("Top 3 apps", f"{top_share:.0f} %", "del tiempo en apps"),
-        ("Cuota de distracción", f"{d.distract_share.mean()*100:.0f} %",
-         "social + ocio + juegos"),
+        ("Attributed time", f"{U[who]['attributed_h']:.0f} h",
+         f"{U[who]['attributed_h']/U[who]['screen_h']*100:.0f} % of screen time"),
+        ("Distinct apps", f"{len(apps)}", "over the whole month"),
+        ("Distinct domains", f"{len(sites)}", "over the whole month"),
+        ("Top 3 apps", f"{top_share:.0f} %", "of time spent in apps"),
+        ("Distraction share", f"{d.distract_share.mean()*100:.0f} %",
+         "social + entertainment + games"),
     ])
 
     st.markdown("")
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(charts.top_bars(apps, f"Usuario {who} · apps por minutos"),
+        st.plotly_chart(charts.top_bars(apps, f"User {who} · apps by minutes"),
                         width="stretch", key="k_apps")
     with c2:
-        st.plotly_chart(charts.top_bars(sites, f"Usuario {who} · dominios por minutos"),
+        st.plotly_chart(charts.top_bars(sites, f"User {who} · domains by minutes"),
                         width="stretch", key="k_sites")
 
     st.caption(
-        "Color por categoría de contenido, misma escala que el gráfico inferior. "
-        "Aperturas y minutos por apertura, en el tooltip y en la tabla completa."
+        "Colour is the content category, the same scale as the chart below. "
+        "Openings and minutes per opening are in the tooltip and the full table."
     )
 
     st.plotly_chart(charts.category_area(
-        U[who]["cats"], f"Usuario {who} · minutos por categoría de contenido"),
+        U[who]["cats"], f"User {who} · minutes by content category"),
         width="stretch", key="k_cats")
 
     chrome = apps[apps.key == "com.android.chrome"]
     if who == "A":
         news = sites[sites.category == "NEWS"].minutes.sum() / sites.minutes.sum() * 100
         note(
-            f"<b>Catálogo reducido.</b> {len(apps)} apps en 30 días: WhatsApp, "
-            f"Spotify, Gmail, Maps, Teléfono y Calendario concentran casi todo, y "
-            f"el top 3 se lleva el {top_share:.0f} % del tiempo en apps.<br><br>"
-            f"<b>Navegación.</b> {news:.0f} % de los minutos son prensa "
-            f"(bbc.com, elpais.com, elmundo.es, marca.com); el resto, compras "
-            f"puntuales y consultas.<br><br>"
-            f"<b>Distracción a la baja.</b> Media del "
-            f"{d.distract_share.mean()*100:.0f} %, de "
-            f"{wk(d,'distract_share',1)*100:.0f} % en la semana 1 a "
-            f"{wk(d,'distract_share',4)*100:.0f} % en la 4.",
+            f"<b>Small catalogue.</b> {len(apps)} apps in 30 days: WhatsApp, "
+            f"Spotify, Gmail, Maps, Phone and Calendar take up almost all of it, "
+            f"and the top 3 accounts for {top_share:.0f} % of app time.<br><br>"
+            f"<b>Browsing.</b> {news:.0f} % of the minutes are news sites; the "
+            f"rest is occasional shopping and lookups.<br><br>"
+            f"<b>Distraction falling.</b> Averaging "
+            f"{d.distract_share.mean()*100:.0f} %, from "
+            f"{wk(d,'distract_share',1)*100:.0f} % in week 1 to "
+            f"{wk(d,'distract_share',4)*100:.0f} % in week 4.",
             "good")
         st.caption(
-            f"Chrome aparece con {chrome.opens.iloc[0]:.0f} aperturas y sólo "
-            f"{chrome.minutes.iloc[0]:.0f} min porque el tiempo de navegador se "
-            f"atribuye al dominio visitado, no al navegador."
+            f"Chrome shows {chrome.opens.iloc[0]:.0f} openings and only "
+            f"{chrome.minutes.iloc[0]:.0f} min because browser time is "
+            f"attributed to the domain visited, not to the browser."
         )
     else:
         msg = apps[apps.category == "MESSAGING"].minutes.sum()
         note(
-            f"<b>Uso disperso.</b> {len(apps)} apps frente a las "
-            f"{len(U['A']['apps'])} del usuario A, y el top 3 concentra sólo el "
-            f"{top_share:.0f} % del tiempo.<br><br>"
-            f"<b>Mensajería en paralelo.</b> {msg:,.0f} min repartidos entre "
-            f"WhatsApp, Mensajes y Telegram.<br><br>"
-            f"<b>Cuota de distracción en rango normal.</b> "
-            f"{d.distract_share.mean()*100:.0f} %, frente al "
-            f"{F['A'].distract_share.mean()*100:.0f} % del usuario A. El reparto "
-            f"por categorías no es el problema de este perfil; lo son el volumen "
-            f"total y el horario.",
+            f"<b>Spread-out use.</b> {len(apps)} apps against user A's "
+            f"{len(U['A']['apps'])}, and the top 3 holds only "
+            f"{top_share:.0f} % of the time.<br><br>"
+            f"<b>Parallel messaging.</b> {msg:,.0f} min split across WhatsApp, "
+            f"Messages and Telegram.<br><br>"
+            f"<b>Distraction share in the normal range.</b> "
+            f"{d.distract_share.mean()*100:.0f} %, against user A's "
+            f"{F['A'].distract_share.mean()*100:.0f} %. The category split is "
+            f"not this profile's problem; the total volume and the timing are.",
             "warn")
         st.caption(
-            "Este gráfico sólo recoge contenido que llegó a abrirse. Roblox y "
-            "Clash of Clans no aparecen pese a 75 y 71 intentos, porque el filtro "
-            "dejó pasar 2 y 0 respectivamente. El detalle de intentos bloqueados "
-            "está en «Lo que el teléfono paró»."
+            "This chart only holds content that actually opened. Roblox and "
+            "Clash of Clans do not appear despite 75 and 71 attempts, because "
+            "the filter let 2 and 0 through respectively. The detail of blocked "
+            "attempts is in \"What the phone stopped\"."
         )
 
-    with st.expander("Tabla completa de apps y dominios"):
+    with st.expander("Full table of apps and domains"):
         c1, c2 = st.columns(2)
         c1.dataframe(apps.round(1), width="stretch", hide_index=True)
         c2.dataframe(sites.round(1), width="stretch", hide_index=True)
 
 
 # ===========================================================================
-# 6 · BLOQUEOS
+# 6 · BLOCKS
 # ===========================================================================
 with TABS[5]:
     d = F[who]
     bf = U[who]["blocks"]
-    st.markdown(f"### Usuario {who} · intentos bloqueados")
+    st.markdown(f"### User {who} · blocked attempts")
 
     st.markdown(
-        '<span class="tag">sólo en el dispositivo</span>'
-        '<span class="tag">al tutor sólo llega el agregado</span>',
+        '<span class="tag">device only</span>'
+        '<span class="tag">only the aggregate reaches a guardian</span>',
         unsafe_allow_html=True)
 
     if bf.empty:
-        st.info("Sin bloqueos en el periodo.")
+        st.info("No blocks in the period.")
     else:
-        # La semana la asigna `daily_frame` y aquí sólo se consulta. Recalcularla
-        # desde el primer día del frame se desviaría en cuanto el primer día del
-        # fichero fuese parcial y quedase fuera.
-        semana_de = dict(zip(d["day"], d["week"]))
-        bf = bf.assign(week=[semana_de[x] for x in bf["day"]])
+        # The week is assigned by `daily_frame` and only looked up here.
+        # Recomputing it from the frame's first day would drift as soon as the
+        # file's first day was partial and dropped out.
+        week_of = dict(zip(d["day"], d["week"]))
+        bf = bf.assign(week=[week_of[x] for x in bf["day"]])
         sens = bf[bf.category.isin(SENSITIVE)]
         kpis([
-            ("Intentos bloqueados", f"{len(bf):,}", f"{len(bf)/len(d):.1f} al día"),
-            ("Apps bloqueadas", f"{d.blocks_app.sum():,}", None),
-            ("Sitios bloqueados", f"{d.blocks_url.sum():,}", None),
-            ("Detección de desnudos", f"{d.blocks_nudity.sum():,}", "en dispositivo"),
-            ("Adulto + apuestas", f"{len(sens):,}",
-             f"{len(sens)/max(len(bf),1)*100:.0f} % del total"),
-            ("Llegaron a abrirse", "0", "de las sensibles"),
+            ("Blocked attempts", f"{len(bf):,}", f"{len(bf)/len(d):.1f} per day"),
+            ("Apps blocked", f"{d.blocks_app.sum():,}", None),
+            ("Sites blocked", f"{d.blocks_url.sum():,}", None),
+            ("Nudity detection", f"{d.blocks_nudity.sum():,}", "on device"),
+            ("Adult + gambling", f"{len(sens):,}",
+             f"{len(sens)/max(len(bf),1)*100:.0f} % of the total"),
+            ("Ever opened", "0", "of the sensitive ones"),
         ])
 
         st.markdown("")
         c1, c2 = st.columns([3, 2])
         with c1:
             st.plotly_chart(charts.blocks_daily(
-                bf, f"Usuario {who} · intentos bloqueados por día"),
+                bf, f"User {who} · blocked attempts per day"),
                 width="stretch", key="k_blocks_daily")
         with c2:
             st.plotly_chart(charts.blocks_by_hour(
-                bf, f"Usuario {who} · bloqueos por hora del día"),
+                bf, f"User {who} · blocks by hour of day"),
                 width="stretch", key="k_blocks_hour")
 
-        # el mes no cae en semanas de 7: la última es una cola de 2 días y hay
-        # que decirlo, o parece que los bloqueos se desploman al final.
+        # the month does not fall into 7-day weeks: the last one is a 2-day
+        # tail and that has to be said, or blocks look like they collapse at
+        # the end.
         n_days = d.groupby("week").size()
         pivot = pd.crosstab(bf.category, bf.week)
-        pivot.columns = [f"Semana {c} ({n_days[c]} d)" for c in pivot.columns]
+        pivot.columns = [f"Week {c} ({n_days[c]} d)" for c in pivot.columns]
         st.dataframe(pivot, width="stretch")
 
         if who == "A":
             note(
-                f"<b>{len(bf)} intentos en 30 días</b>, todos de "
-                f"<code>SOCIAL_MEDIA</code> y <code>ENTERTAINMENT</code>. Cero "
-                f"contenido sensible en el periodo.<br><br>"
-                f"<b>Tendencia a la baja:</b> {wk(d,'blocks',1,'sum'):.0f} "
-                f"bloqueos en la semana 1, {wk(d,'blocks',4,'sum'):.0f} en la "
-                f"semana 4. El filtro interviene cada vez menos, lo que indica que "
-                f"el hábito de apertura se ha desplazado y no sólo que la barrera "
-                f"lo esté conteniendo.<br><br>"
-                f"Este perfil no requiere acción ni genera avisos.",
+                f"<b>{len(bf)} attempts in 30 days</b>, all of them "
+                f"<code>SOCIAL_MEDIA</code> and <code>ENTERTAINMENT</code>. Zero "
+                f"sensitive content in the period.<br><br>"
+                f"<b>Falling trend:</b> {wk(d,'blocks',1,'sum'):.0f} blocks in "
+                f"week 1, {wk(d,'blocks',4,'sum'):.0f} in week 4. The filter "
+                f"steps in less and less, which suggests the opening habit has "
+                f"moved rather than the barrier merely holding it back.<br><br>"
+                f"This profile needs no action and generates no alerts.",
                 "good")
         else:
             adult = bf[bf.category == "ADULT"]
@@ -774,61 +773,59 @@ with TABS[5]:
             nud = bf[bf.block_type == "NUDITY"]
             wk23 = len(sens[sens.week.isin([2, 3])])
             note(
-                f"<b>Distracción ordinaria: {len(bf)-len(sens):,} intentos</b>, en "
-                f"aumento ({wk(d,'blocks',1,'sum'):.0f} → "
-                f"{wk(d,'blocks',4,'sum'):.0f} por semana). Social y ocio, "
-                f"principalmente.<br><br>"
-                f"<b>Contenido sensible: {len(adult)} intentos de contenido adulto "
-                f"y {len(gamb)} de apuestas</b>, con {len(nud)} detecciones de "
-                f"desnudos en dispositivo. Todos bloqueados; ninguno llegó a "
-                f"abrirse.<br><br>"
-                f"<b>Forma temporal: pico, no tendencia.</b> {wk23} de los "
-                f"{len(sens)} intentos sensibles ({wk23/len(sens)*100:.0f} %) caen "
-                f"en las semanas 2 y 3; en la 4 bajan a "
+                f"<b>Ordinary distraction: {len(bf)-len(sens):,} attempts</b>, "
+                f"rising ({wk(d,'blocks',1,'sum'):.0f} → "
+                f"{wk(d,'blocks',4,'sum'):.0f} per week). Mostly social and "
+                f"entertainment.<br><br>"
+                f"<b>Sensitive content: {len(adult)} adult attempts and "
+                f"{len(gamb)} gambling ones</b>, with {len(nud)} on-device "
+                f"nudity detections. All blocked; none ever opened.<br><br>"
+                f"<b>Shape over time: a spike, not a trend.</b> {wk23} of the "
+                f"{len(sens)} sensitive attempts ({wk23/len(sens)*100:.0f} %) "
+                f"fall in weeks 2 and 3; in week 4 they drop to "
                 f"{len(sens[sens.week==4])}.<br><br>"
-                f"<b>Persistencia baja.</b> Agrupados en ráfagas de 10 minutos: "
-                f"1,2 intentos de media, máximo 3. El patrón es de intento "
-                f"aislado seguido de abandono, no de insistencia sobre el mismo "
-                f"contenido. Por eso este bloque no genera notificación inmediata "
-                f"al tutor, sino entrada en el resumen semanal "
-                f"(ver «Alertas y nudges»).",
+                f"<b>Low persistence.</b> Grouped into 10-minute bursts: 1.2 "
+                f"attempts on average, 3 at most. The pattern is an isolated "
+                f"attempt followed by giving up, not insistence on the same "
+                f"content. That is why this block generates no immediate "
+                f"guardian notification, only a weekly summary entry (see "
+                f"\"Alerts and nudges\").",
                 "warn")
 
-    st.markdown("### Alcance de estos datos")
+    st.markdown("### Scope of this data")
     note(
-        "Esta pestaña es vista de dispositivo. Los nombres de app y dominio, los "
-        "conteos por objeto y las horas exactas no se transmiten a ningún tutor ni "
-        "a ningún servidor.<br><br>"
-        "En perfiles con tutor, lo que sí puede salir en su resumen es el estado "
-        "agregado del "
-        "filtro (<i>«actuó como de costumbre»</i> / <i>«actuó más de lo "
-        "habitual»</i>) y el hecho de que "
-        f"<b>{len(bf[bf.category.isin(SENSITIVE)]) if not bf.empty else 0} intentos "
-        f"de contenido sensible fueron bloqueados y ninguno llegó a abrirse</b>. "
-        "Comprobado sobre el stream: no hay ningún <code>URL_VISIT</code> ni "
-        "<code>APP_FOREGROUND</code> con categoría <code>ADULT</code> o "
-        "<code>GAMBLING</code> en ninguno de los dos ficheros."
+        "This tab is the device-side view. App and domain names, per-object "
+        "counts and exact times are transmitted to no guardian and no server."
+        "<br><br>"
+        "On profiles with a guardian, what can appear in their digest is the "
+        "aggregate state of the filter (<i>\"acted as usual\"</i> / "
+        "<i>\"acted more than usual\"</i>) and the fact that "
+        f"<b>{len(bf[bf.category.isin(SENSITIVE)]) if not bf.empty else 0} "
+        f"sensitive-content attempts were blocked and none ever opened</b>. "
+        "Verified against the stream: there is no <code>URL_VISIT</code> nor "
+        "<code>APP_FOREGROUND</code> with category <code>ADULT</code> or "
+        "<code>GAMBLING</code> in either file."
     )
 
 # ===========================================================================
-# 7 · ALERTAS Y NUDGES
+# 7 · ALERTS AND NUDGES
 # ===========================================================================
 with TABS[6]:
     d = F[who]
     sigs = U[who]["alerts"]
     nud = U[who]["nudges"]
     ns = nudge_summary(nud)
-    sent = [x for x in sigs if x.decision == "enviada"]
+    sent = [x for x in sigs if x.decision == "sent"]
 
-    st.markdown(f"### Usuario {who} · recorrido del mes")
+    st.markdown(f"### User {who} · month walkthrough")
     st.caption(
-        "Todas las variables que leen las reglas, en un eje. Cada serie va como "
-        "porcentaje de su propio máximo del periodo, que es lo que permite "
-        "compararlas sin recurrir a dos escalas: lo que se lee es la forma y la "
-        "coincidencia en el tiempo, y el valor real con su unidad está en el "
-        "tooltip. **Haz clic en la leyenda** para encender o apagar cualquier "
-        "serie. Debajo del cero, el carril con lo que el teléfono emitió cada "
-        "día. La línea blanca es el día seleccionado."
+        "Every variable the rules read, on one axis. Each series runs as a "
+        "percentage of its own maximum for the period, which is what lets them "
+        "be compared without a second scale: what you read is the shape and the "
+        "coincidence in time, and the real value with its unit is in the "
+        "tooltip. **Click the legend** to switch any series on or off. Below "
+        "zero, the rail showing what the phone emitted each day. The white line "
+        "is the selected day."
     )
 
     replay = U[who]["replay"]
@@ -837,7 +834,7 @@ with TABS[6]:
     default_day = next((r["day"] for r in replay if r["alert"]), days_list[-1])
 
     cursor = st.select_slider(
-        "Día del periodo", options=days_list, value=default_day,
+        "Day of the period", options=days_list, value=default_day,
         format_func=fecha, key=f"cursor_{who}")
     st_now = by_day[cursor]
 
@@ -845,9 +842,9 @@ with TABS[6]:
     alert_days, positive_days = {}, {}
     for r in replay:
         if r["alert"]:
-            alert_days[r["day"]] = "enviada"
+            alert_days[r["day"]] = "sent"
         elif r["digest_entry"]:
-            alert_days[r["day"]] = "resumen"
+            alert_days[r["day"]] = "summary"
         if r["positives"]:
             positive_days[r["day"]] = True
 
@@ -856,407 +853,404 @@ with TABS[6]:
                               positive_days),
         width="stretch", key=f"k_tracked_{who}")
 
-    st.markdown(f"#### Salidas del {fecha(cursor)}")
+    st.markdown(f"#### Outputs on {fecha(cursor)}")
     row = F[who].set_index("day").loc[cursor]
     n = st_now["nudge"]
-    pos_user = [x for x in st_now["positives"] if x.audience == "usuario"]
-    pos_guard = [x for x in st_now["positives"] if x.audience == "tutor"]
+    pos_user = [x for x in st_now["positives"] if x.audience == "user"]
+    pos_guard = [x for x in st_now["positives"] if x.audience == "guardian"]
 
     cols = st.columns(3 if HAS_GUARDIAN[who] else 2)
 
     with cols[0]:
-        st.markdown('<div class="eyebrow">Pantalla del usuario</div>',
+        st.markdown('<div class="eyebrow">User\'s screen</div>',
                     unsafe_allow_html=True)
         if pos_user:
             x = pos_user[0]
             st.markdown(theme.phone(
                 "09:00", "BALANCE",
-                f"<div class='phone-eyebrow'>Tu resumen</div>"
+                f"<div class='phone-eyebrow'>Your summary</div>"
                 f"<div class='phone-h'>{x.headline}</div>"
                 f"<div class='phone-p'>{x.guardian_text}</div>"
                 + "".join(f"<div class='phone-row'><span>{k}</span>"
                           f"<span>{v}</span></div>"
                           for k, v in x.evidence.items())
-                + "<div class='phone-cta ghost'>Ver la semana</div>"),
+                + "<div class='phone-cta ghost'>See the week</div>"),
                 unsafe_allow_html=True)
         elif n and n.fired:
             st.markdown(theme.phone(
                 pd.Timestamp(n.at_ms, unit="ms").strftime("%H:%M"), "BALANCE",
-                f"<div class='phone-eyebrow'>Nudge nocturno</div>"
-                f"<div class='phone-h'>Es la {n.reopens}ª vez que abres el "
-                f"teléfono esta noche.</div>"
-                f"<div class='phone-p'>Hace un mes, a esta hora ya lo habías "
-                f"soltado.</div>"
-                f"<div class='phone-cta'>Apagar hasta mañana</div>"
-                f"<div class='phone-cta ghost'>5 minutos más</div>"),
+                f"<div class='phone-eyebrow'>Night nudge</div>"
+                f"<div class='phone-h'>That is the {n.reopens}th time you have "
+                f"opened your phone tonight.</div>"
+                f"<div class='phone-p'>A month ago you had already put it down "
+                f"by now.</div>"
+                f"<div class='phone-cta'>Off until tomorrow</div>"
+                f"<div class='phone-cta ghost'>5 more minutes</div>"),
                 unsafe_allow_html=True)
         else:
-            empty_box("Sin notificaciones")
+            empty_box("No notifications")
 
     if HAS_GUARDIAN[who]:
         with cols[1]:
-            st.markdown('<div class="eyebrow">Teléfono del tutor</div>',
+            st.markdown('<div class="eyebrow">Guardian\'s phone</div>',
                         unsafe_allow_html=True)
             g = st_now["alert"] or (pos_guard[0] if pos_guard else None)
             if g is not None:
                 st.markdown(theme.phone(
-                    "09:12", f"BALANCE · TUTOR DE {who}",
+                    "09:12", f"BALANCE · GUARDIAN OF {who}",
                     f"<div class='phone-eyebrow'>"
-                    f"{'Aviso' if g.tone == 'aviso' else 'Resumen'}</div>"
+                    f"{'Alert' if g.tone == 'alert' else 'Summary'}</div>"
                     f"<div class='phone-h'>{g.headline}</div>"
                     f"<div class='phone-p'>{g.guardian_text}</div>"
-                    f"<div class='phone-cta ghost'>Ver resumen semanal</div>"),
+                    f"<div class='phone-cta ghost'>See weekly summary</div>"),
                     unsafe_allow_html=True)
             else:
-                empty_box("Sin notificaciones")
+                empty_box("No notifications")
 
     with cols[-1]:
-        st.markdown('<div class="eyebrow">Guardado en el dispositivo</div>',
+        st.markdown('<div class="eyebrow">Stored on the device</div>',
                     unsafe_allow_html=True)
         st.markdown(
-            f"<div class='phone-row'><span>Pantalla</span>"
+            f"<div class='phone-row'><span>Screen</span>"
             f"<span>{row.screen_min:.0f} min</span></div>"
-            f"<div class='phone-row'><span>Desbloqueos</span>"
+            f"<div class='phone-row'><span>Unlocks</span>"
             f"<span>{row.pickups:.0f}</span></div>"
-            f"<div class='phone-row'><span>Madrugada</span>"
+            f"<div class='phone-row'><span>Late night</span>"
             f"<span>{row.night_min:.0f} min</span></div>"
-            f"<div class='phone-row'><span>Última pantalla nocturna</span>"
+            f"<div class='phone-row'><span>Last night-band screen</span>"
             f"<span>{reloj(row.night_end_h)}</span></div>"
-            f"<div class='phone-row'><span>Desconexión más larga</span>"
+            f"<div class='phone-row'><span>Longest disconnection</span>"
             f"<span>{row.longest_offline_h:.1f} h</span></div>"
-            f"<div class='phone-row'><span>· empezó</span>"
-            f"<span>{row.longest_offline_when or 'sin racha'}</span></div>"
-            f"<div class='phone-row'><span>Cuota de distracción</span>"
+            f"<div class='phone-row'><span>· started</span>"
+            f"<span>{row.longest_offline_when or 'no stretch'}</span></div>"
+            f"<div class='phone-row'><span>Distraction share</span>"
             f"<span>{row.distract_share*100:.0f} %</span></div>"
-            f"<div class='phone-row'><span>Intentos sensibles</span>"
+            f"<div class='phone-row'><span>Sensitive attempts</span>"
             f"<span>{row.blocks_sensitive:.0f}</span></div>"
-            f"<div class='phone-row'><span>Bloqueos totales</span>"
+            f"<div class='phone-row'><span>Total blocks</span>"
             f"<span>{row.blocks:.0f}</span></div>"
-            f"<div class='phone-row'><span>Índice del día</span>"
+            f"<div class='phone-row'><span>Index for the day</span>"
             f"<span>{row.score:.0f} / 100</span></div>"
-            f"<div class='phone-row'><span>Nudges hasta hoy</span>"
+            f"<div class='phone-row'><span>Nudges so far</span>"
             f"<span>{st_now['nudges_so_far']}</span></div>"
-            f"<div class='phone-row'><span>Refuerzos hasta hoy</span>"
+            f"<div class='phone-row'><span>Reinforcements so far</span>"
             f"<span>{st_now['positives_so_far']}</span></div>",
             unsafe_allow_html=True)
         st.caption(
-            "Estas cifras se calculan y se almacenan en el teléfono."
-            + ("  Al tutor sólo llega el agregado redondeado del resumen "
-               "semanal." if HAS_GUARDIAN[who] else "")
+            "These figures are computed and stored on the phone."
+            + ("  Only the rounded aggregate of the weekly digest reaches the "
+               "guardian." if HAS_GUARDIAN[who] else "")
         )
 
-    st.markdown(f"### Todo lo que emitió el teléfono en el mes")
+    st.markdown("### Everything the phone emitted this month")
     em = U[who]["emissions"]
     if em:
         st.dataframe(pd.DataFrame([{
-            "Fecha": fecha(e["day"]),
-            "Destino": e["destino"],
-            "Tipo": e["tipo"],
-            "Detalle": e["detalle"],
+            "Date": fecha(e["day"]),
+            "Destination": e["destination"],
+            "Type": e["type"],
+            "Detail": e["detail"],
         # altura al contenido: una tabla de 3 filas con hueco para 10 parece
         # que ha fallado la carga.
         } for e in em]), width="stretch", hide_index=True,
             height=min(320, 38 + 35 * len(em)))
         st.caption(
-            f"{len(em)} salidas en 30 días: "
-            f"{sum(1 for e in em if e['destino'].startswith('Usuario'))} al "
-            f"usuario, "
-            f"{sum(1 for e in em if e['destino'] == 'Tutor · notificación')} "
-            f"como notificación al tutor y "
-            f"{sum(1 for e in em if e['destino'] == 'Tutor · resumen semanal')} "
-            f"como entrada de resumen semanal."
+            f"{len(em)} outputs over 30 days: "
+            f"{sum(1 for e in em if e['destination'].startswith('User'))} to "
+            f"the user, "
+            f"{sum(1 for e in em if e['destination'] == 'Guardian · notification')} "
+            f"as a guardian notification and "
+            f"{sum(1 for e in em if e['destination'] == 'Guardian · weekly summary')} "
+            f"as a weekly summary entry."
         )
     else:
-        st.caption("El teléfono no emitió nada en el periodo.")
+        st.caption("The phone emitted nothing in the period.")
 
-    st.markdown(f"### Usuario {who} · notificaciones del periodo")
+    st.markdown(f"### User {who} · notifications in the period")
     kpis([
-        ("Notificaciones al tutor",
+        ("Guardian notifications",
          f"{len(sent)}" if HAS_GUARDIAN[who] else "n/a",
-         f"cupo {ALERT_BUDGET}/mes" if HAS_GUARDIAN[who] else "perfil sin tutor"),
-        ("En resumen semanal",
-         f"{sum(1 for x in sigs if x.decision == 'resumen')}"
-         if HAS_GUARDIAN[who] else "n/a", "sin notificación"),
-        ("Refuerzos enviados",
-         f"{sum(1 for x in U[who]['positives'] if x.decision == 'enviada')}",
-         "uno por semana como máximo"),
-        ("Noches con nudge", f"{ns['noches con aviso']}/{ns['noches']}",
-         f"{ns['tasa de aparición']*100:.0f} % de las noches"),
-        ("Min tras el nudge", f"{ns['min en juego tras el aviso']:.0f}",
-         f"{ns['cuota del total nocturno']*100:.0f} % del total nocturno"),
+         f"quota {ALERT_BUDGET}/month" if HAS_GUARDIAN[who] else "no guardian"),
+        ("Into weekly summary",
+         f"{sum(1 for x in sigs if x.decision == 'summary')}"
+         if HAS_GUARDIAN[who] else "n/a", "not notified"),
+        ("Reinforcements sent",
+         f"{sum(1 for x in U[who]['positives'] if x.decision == 'sent')}",
+         "one per week at most"),
+        ("Nights with a nudge", f"{ns["nights with a nudge"]}/{ns["nights"]}",
+         f"{ns["appearance rate"]*100:.0f} % of nights"),
+        ("Min after the nudge", f"{ns["minutes at stake after the nudge"]:.0f}",
+         f"{ns["share of night total"]*100:.0f} % of the night total"),
     ])
 
-    st.markdown("### Notificaciones enviadas al tutor")
+    st.markdown("### Notifications sent to the guardian")
     if not HAS_GUARDIAN[who]:
         note(
-            f"<b>Perfil sin tutor asignado.</b> El usuario {who} es un adulto: no "
-            f"hay destinatario al que notificar, así que las reglas de aviso "
-            f"corren igual pero su salida sólo alimenta el índice y los nudges en "
-            f"el propio dispositivo.<br><br>"
-            f"En el periodo no se ha activado ninguna de las tres reglas: "
-            f"{d.night_min.sum():.0f} minutos de pantalla nocturna en 30 días y "
-            f"{ns['noches con aviso']} noches con nudge.",
+            f"<b>No guardian assigned.</b> User {who} is an adult: there is no "
+            f"recipient to notify, so the alert rules run all the same but their "
+            f"output only feeds the index and the nudges on the device "
+            f"itself.<br><br>"
+            f"None of the three rules fired in the period: "
+            f"{d.night_min.sum():.0f} minutes of night-band screen over 30 days "
+            f"and {ns["nights with a nudge"]} nights with a nudge.",
             "good")
     elif not sent:
         note(
-            f"<b>Ninguna en el periodo.</b> El usuario {who} no ha activado "
-            f"ninguna regla: {d.night_min.sum():.0f} minutos de pantalla nocturna "
-            f"en 30 días y {ns['noches con aviso']} noches con nudge. El tutor "
-            f"recibe únicamente el resumen semanal en estado «todo en orden».",
+            f"<b>None in the period.</b> User {who} fired no rule at all: "
+            f"{d.night_min.sum():.0f} minutes of night-band screen over 30 days "
+            f"and {ns["nights with a nudge"]} nights with a nudge. The guardian "
+            f"receives only the weekly digest, in the \"all in order\" state.",
             "good")
     for x in sent:
         ev = "".join(f"<div class='phone-row'><span>{k}</span>"
                      f"<span>{v}</span></div>" for k, v in x.evidence.items())
         st.markdown(
-            f'<div class="eyebrow">Notificación · {fecha(x.day)} · '
-            f'destinatario: tutor del usuario {who}</div>',
+            f'<div class="eyebrow">Notification · {fecha(x.day)} · '
+            f'recipient: guardian of user {who}</div>',
             unsafe_allow_html=True)
         _pc, _pr = st.columns([1, 2])
         with _pc:
             st.markdown(theme.phone(
-                "09:12", f"BALANCE · TUTOR DE {who}",
-                f"<div class='phone-eyebrow'>Aviso</div>"
+                "09:12", f"BALANCE · GUARDIAN OF {who}",
+                f"<div class='phone-eyebrow'>Alert</div>"
                 f"<div class='phone-h'>{x.headline}</div>"
                 f"<div class='phone-p'>{x.guardian_text}</div>"
-                f"<div class='phone-cta ghost'>Ver resumen semanal</div>"),
+                f"<div class='phone-cta ghost'>See weekly summary</div>"),
                 unsafe_allow_html=True)
         note(
-            f"<b>Regla:</b> <code>{x.key}</code> · "
-            f"activa del {fecha(x.day)} al {fecha(x.until)} "
-            f"({x.days_true} días) · prioridad {x.priority:.2f}.<br><br>"
-            f"La regla deja de cumplirse el {fecha(x.until)} porque la referencia "
-            f"móvil de 14 días incorpora el comportamiento nuevo. El aviso se "
-            f"emite una vez, al detectar el cambio. El nivel absoluto sigue "
-            f"reflejado en el índice y en el resumen semanal, que no usan "
-            f"referencia móvil.",
+            f"<b>Rule:</b> <code>{x.key}</code> · "
+            f"active from {fecha(x.day)} to {fecha(x.until)} "
+            f"({x.days_true} days) · priority {x.priority:.2f}.<br><br>"
+            f"The rule stops holding on {fecha(x.until)} because the rolling "
+            f"14-day reference absorbs the new behaviour. The alert is issued "
+            f"once, on detecting the change. The absolute level stays visible in "
+            f"the index and the weekly digest, which use no rolling reference.",
             "serious")
-        with st.expander("Datos que respaldan el aviso (no salen del dispositivo)"):
+        with st.expander("Data behind the alert (never leaves the device)"):
             st.markdown(ev, unsafe_allow_html=True)
             st.caption(
-                "El tutor recibe el texto de la notificación. Estas cifras se "
-                "calculan y se quedan en el teléfono.")
+                "The guardian receives the notification text. These figures "
+                "are computed and stay on the phone.")
 
-    st.markdown("### Refuerzos enviados al usuario")
+    st.markdown("### Reinforcements sent")
     pos = U[who]["positives"]
-    pos_sent = [x for x in pos if x.decision == "enviada"]
+    pos_sent = [x for x in pos if x.decision == "sent"]
     if pos_sent:
         for x in pos_sent:
             st.markdown(
-                f'<div class="eyebrow">{fecha(x.day)} · destinatario: '
-                f'{"el propio usuario" if x.audience == "usuario" else f"tutor del usuario {who}"}'
+                f'<div class="eyebrow">{fecha(x.day)} · recipient: '
+                f'{"the user themselves" if x.audience == "user" else f"guardian of user {who}"}'
                 f'</div>', unsafe_allow_html=True)
-            note(f"<b>{x.headline}</b><br>«{x.guardian_text}»", "good")
+            note(f"<b>{x.headline}</b><br>\"{x.guardian_text}\"", "good")
     else:
-        st.caption("Ningún refuerzo en el periodo.")
-    pos_held = [x for x in pos if x.decision != "enviada"]
+        st.caption("No reinforcement in the period.")
+    pos_held = [x for x in pos if x.decision != "sent"]
     if pos_held:
-        with st.expander(f"{len(pos_held)} refuerzos registrados sin notificar"):
+        with st.expander(f"{len(pos_held)} reinforcements recorded, not notified"):
             st.dataframe(pd.DataFrame([{
-                "Fecha": fecha(x.day), "Regla": x.key,
-                "Destinatario": x.audience,
-                "Detalle": x.guardian_text, "Motivo": x.reason,
+                "Date": fecha(x.day), "Rule": x.key,
+                "Recipient": x.audience,
+                "Detail": x.guardian_text, "Reason": x.reason,
             } for x in pos_held]), width="stretch", hide_index=True)
 
-    st.markdown("### Señales retenidas")
-    rest = [x for x in sigs if x.decision != "enviada"]
+    st.markdown("### Held signals")
+    rest = [x for x in sigs if x.decision != "sent"]
     if rest:
         st.dataframe(pd.DataFrame([{
-            "Regla": x.key,
-            "Detectada": fecha(x.day),
-            "Prioridad": x.priority,
-            "Destino": x.decision,
-            "Motivo": x.reason,
+            "Rule": x.key,
+            "Detected": fecha(x.day),
+            "Priority": x.priority,
+            "Destination": x.decision,
+            "Reason": x.reason,
         } for x in rest]), width="stretch", hide_index=True)
     else:
-        st.caption("Ninguna señal retenida en el periodo.")
+        st.caption("No signal held in the period.")
 
-    st.markdown("### Cobertura de las reglas")
+    st.markdown("### Rule coverage")
     rows = []
     for key, desc in [
-        ("night_drift", "Mediana de 5 noches contra las 14 anteriores, más "
-                        "retraso de la hora de última pantalla"),
-        ("sensitive_spike", "Intentos ADULT o GAMBLING de 7 días contra el "
-                            "ritmo de los 7 anteriores"),
-        ("screen_jump", "Mediana de tiempo de pantalla de 5 días contra las 14 "
-                        "anteriores"),
+        ("night_drift", "Median of 5 nights against the previous 14, plus the "
+                        "delay in the time of the last screen"),
+        ("sensitive_spike", "ADULT or GAMBLING attempts over 7 days against the "
+                            "rate of the previous 7"),
+        ("screen_jump", "Median screen time over 5 days against the previous "
+                        "14"),
     ]:
         hit = next((x for x in sigs if x.key == key), None)
         rows.append({
-            "Regla": key,
-            "Qué compara": desc,
-            "Usuario A": next((f"{x.decision} · {fecha(x.day)}"
-                               for x in U["A"]["alerts"] if x.key == key),
-                              "no se activa"),
-            "Usuario B": next((f"{x.decision} · {fecha(x.day)}"
-                               for x in U["B"]["alerts"] if x.key == key),
-                              "no se activa"),
+            "Rule": key,
+            "What it compares": desc,
+            "User A": next((f"{x.decision} · {fecha(x.day)}"
+                            for x in U["A"]["alerts"] if x.key == key),
+                           "does not fire"),
+            "User B": next((f"{x.decision} · {fecha(x.day)}"
+                            for x in U["B"]["alerts"] if x.key == key),
+                           "does not fire"),
         })
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     note(
-        f"<code>screen_jump</code> no se activa en ninguno de los dos perfiles. "
-        f"El uso diario del usuario B crece un "
-        f"{(wk(F['B'],'screen_min',4)/wk(F['B'],'screen_min',1)-1)*100:.0f} % en "
-        f"el mes, por debajo del umbral de cualquier regla de volumen razonable, "
-        f"mientras su franja nocturna se multiplica por "
-        f"{wk(F['B'],'night_min',4)/max(wk(F['B'],'night_min',1),.01):.0f}. La "
-        f"detección de este caso depende de vigilar el horario, no el total.",
+        f"<code>screen_jump</code> fires on neither profile. User B's daily use "
+        f"grows {(wk(F['B'],'screen_min',4)/wk(F['B'],'screen_min',1)-1)*100:.0f} "
+        f"% over the month, below the threshold of any reasonable volume rule, "
+        f"while their night band multiplies by "
+        f"{wk(F['B'],'night_min',4)/max(wk(F['B'],'night_min',1),.01):.0f}. "
+        f"Catching this case depends on watching the schedule, not the total.",
         "warn")
 
-    st.markdown("### Nudge en dispositivo")
+    st.markdown("### On-device nudge")
     st.caption(
-        f"Se muestra en la segunda reapertura a partir de las "
-        f"{int(23 + NUDGE_AFTER_MIN // 60):02d}:{NUDGE_AFTER_MIN % 60:02d}, una "
-        f"vez por noche como máximo. Cifras obtenidas reproduciendo la regla "
-        f"sobre los 30 días del periodo."
+        f"Shown on the second reopening from "
+        f"{int(23 + NUDGE_AFTER_MIN // 60):02d}:{NUDGE_AFTER_MIN % 60:02d} "
+        f"onwards, at most once per night. The figures come from replaying the "
+        f"rule over the 30 days of the period."
     )
     ca, cb = st.columns(2)
     with ca:
-        st.markdown(f"**Usuario {who} · activación**")
+        st.markdown(f"**User {who} · activation**")
         st.markdown(
-            f"<div class='phone-row'><span>Noches evaluadas</span>"
-            f"<span>{ns['noches']}</span></div>"
-            f"<div class='phone-row'><span>Noches con aviso</span>"
-            f"<span>{ns['noches con aviso']} "
-            f"({ns['tasa de aparición']*100:.0f} %)</span></div>"
-            f"<div class='phone-row'><span>Min nocturnos del mes</span>"
-            f"<span>{ns['min nocturnos totales']:.0f}</span></div>"
-            f"<div class='phone-row'><span>Min posteriores al aviso</span>"
-            f"<span>{ns['min en juego tras el aviso']:.0f} "
-            f"({ns['cuota del total nocturno']*100:.0f} %)</span></div>"
-            f"<div class='phone-row'><span>Por noche con aviso</span>"
-            f"<span>{ns['min en juego por noche con aviso']:.0f} min</span></div>",
+            f"<div class='phone-row'><span>Nights evaluated</span>"
+            f"<span>{ns["nights"]}</span></div>"
+            f"<div class='phone-row'><span>Nights with a nudge</span>"
+            f"<span>{ns["nights with a nudge"]} "
+            f"({ns["appearance rate"]*100:.0f} %)</span></div>"
+            f"<div class='phone-row'><span>Night minutes this month</span>"
+            f"<span>{ns["total night minutes"]:.0f}</span></div>"
+            f"<div class='phone-row'><span>Minutes after the nudge</span>"
+            f"<span>{ns["minutes at stake after the nudge"]:.0f} "
+            f"({ns["share of night total"]*100:.0f} %)</span></div>"
+            f"<div class='phone-row'><span>Per nudged night</span>"
+            f"<span>{ns["minutes at stake per nudged night"]:.0f} min</span></div>",
             unsafe_allow_html=True)
     with cb:
         quiet = Counter(n.quiet_reason for n in nud if n.quiet_reason)
-        st.markdown("**Noches sin aviso · motivo**")
+        st.markdown("**Nights without a nudge · reason**")
         for reason, n in quiet.most_common():
             st.markdown(
                 f"<div class='phone-row'><span>{reason}</span>"
                 f"<span>{n}</span></div>", unsafe_allow_html=True)
 
     note(
-        f"Los minutos posteriores al aviso acotan el margen del nudge: "
-        f"{nudge_summary(U['B']['nudges'])['min en juego tras el aviso']:.0f} de "
-        f"los {nudge_summary(U['B']['nudges'])['min nocturnos totales']:.0f} "
-        f"minutos nocturnos del usuario B "
-        f"({nudge_summary(U['B']['nudges'])['cuota del total nocturno']*100:.0f} "
-        f"%), unos {nudge_summary(U['B']['nudges'])['min en juego por noche con aviso']:.0f} "
-        f"por noche en que aparece. Es el máximo teórico recuperable, no el "
-        f"efecto esperado.<br><br>"
-        f"La tasa de activación en el usuario A es del 0 %: la regla no se "
-        f"dispara ninguna de sus 30 noches sin necesidad de configuración "
-        f"específica por perfil."
+        f"The minutes after the nudge bound its headroom: "
+        f"{nudge_summary(U['B']['nudges'])["minutes at stake after the nudge"]:.0f} of "
+        f"user B's {nudge_summary(U['B']['nudges'])["total night minutes"]:.0f} "
+        f"night minutes "
+        f"({nudge_summary(U['B']['nudges'])["share of night total"]*100:.0f} %), "
+        f"about {nudge_summary(U['B']['nudges'])["minutes at stake per nudged night"]:.0f} "
+        f"per night it appears. That is the theoretical maximum recoverable, not "
+        f"the expected effect.<br><br>"
+        f"The activation rate on user A is 0 %: the rule fires on none of their "
+        f"30 nights, with no per-profile configuration."
     )
 
 # ===========================================================================
-# 8 · LOS DATOS
+# 8 · THE DATA
 # ===========================================================================
 with TABS[7]:
-    st.markdown("### Qué hay exactamente en los ficheros")
+    st.markdown("### What is actually in the files")
 
     ev = pd.DataFrame([
-        {"Usuario": u, **Counter(e["event_type"] for e in U[u]["events"])}
-        for u in DATA]).set_index("Usuario").T.fillna(0).astype(int)
-    ev["Qué significa"] = [{
-        "SCREEN_ON": "La pantalla se enciende. Puede ser un vistazo o el inicio de un uso real.",
-        "SCREEN_OFF": "La pantalla se apaga.",
-        "USER_PRESENT": "Desbloqueo real (PIN / biometría). Es lo que convierte un SCREEN_ON en pickup.",
-        "APP_FOREGROUND": "Una app pasa a primer plano. Trae package_name y category.",
-        "URL_VISIT": "Página vista en el navegador. Trae url_domain y category. Sólo dominio, nunca ruta.",
-        "BLOCK": "Un intento detenido. El contenido NO llegó a abrirse. Trae block_type.",
+        {"User": u, **Counter(e["event_type"] for e in U[u]["events"])}
+        for u in DATA]).set_index("User").T.fillna(0).astype(int)
+    ev["What it means"] = [{
+        "SCREEN_ON": "The screen lights up. May be a glance or the start of real use.",
+        "SCREEN_OFF": "The screen goes dark.",
+        "USER_PRESENT": "A real unlock (PIN / biometrics). This is what turns a SCREEN_ON into a pickup.",
+        "APP_FOREGROUND": "An app comes to the foreground. Carries package_name and category.",
+        "URL_VISIT": "A page viewed in the browser. Carries url_domain and category. Domain only, never a path.",
+        "BLOCK": "An attempt stopped. The content did NOT open. Carries block_type.",
     }[i] for i in ev.index]
     st.dataframe(ev, width="stretch")
 
-    st.markdown("### Campos del evento")
+    st.markdown("### The eight fields, and what we do with each")
     st.dataframe(pd.DataFrame([
-        ("id", "int", "Monotónico por fichero, en orden temporal.",
-         "Sólo desempate al ordenar."),
-        ("event_type", "str", "Uno de los seis tipos de arriba.",
-         "Máquina de estados de pantalla, atribución de tiempo, bloqueos."),
-        ("timestamp_millis", "int", "Epoch en milisegundos, reloj de pared en UTC.",
-         "Todo. Día = medianoche local; la noche se mide 23:00→06:00 del día siguiente."),
-        ("package_name", "str|null", "Paquete Android. En APP_FOREGROUND y en BLOCK de app.",
-         "Ranking de apps, cambios de app, apps distintas."),
-        ("url_domain", "str|null", "Sólo dominio. En URL_VISIT y en BLOCK de sitio.",
-         "Ranking de dominios. El tiempo de navegador se reasigna al dominio."),
-        ("category", "str|null", "Vocabulario común para apps y sitios.",
-         "Minutos por categoría, cuota de distracción, sensibles (ADULT/GAMBLING)."),
-        ("block_type", "str|null", "APP · URL · NUDITY. Sólo en BLOCK.",
-         "Separa el filtro de listas de la detección de desnudos en dispositivo."),
-        ("is_keyguard_locked", "bool|null", "true en SCREEN_ON pasivo, false en USER_PRESENT.",
-         "Distingue vistazo de pickup real."),
-    ], columns=["Campo", "Tipo", "Qué es", "Para qué lo usamos"]),
+        ("id", "int", "Monotonic within the file, in time order.",
+         "Tie-breaking when sorting, nothing else."),
+        ("event_type", "str", "One of the six types above.",
+         "Screen state machine, time attribution, blocks."),
+        ("timestamp_millis", "int", "Epoch milliseconds, wall clock normalised to UTC.",
+         "Everything. Day = local midnight; the night runs 23:00→06:00 the next day."),
+        ("package_name", "str|null", "Android package. On APP_FOREGROUND and on app BLOCKs.",
+         "App ranking, app switches, distinct apps."),
+        ("url_domain", "str|null", "Domain only. On URL_VISIT and on site BLOCKs.",
+         "Domain ranking. Browser time is reassigned to the domain."),
+        ("category", "str|null", "One shared vocabulary for apps and sites.",
+         "Minutes per category, distraction share, sensitive (ADULT/GAMBLING)."),
+        ("block_type", "str|null", "APP · URL · NUDITY. Only on BLOCK.",
+         "Separates list filtering from on-device nudity detection."),
+        ("is_keyguard_locked", "bool|null", "true on a passive SCREEN_ON, false on USER_PRESENT.",
+         "Tells a glance from a real pickup."),
+    ], columns=["Field", "Type", "What it is", "What we use it for"]),
         width="stretch", hide_index=True)
 
-    st.markdown("### Anomalías del stream y tratamiento aplicado")
+    st.markdown("### Stream anomalies and how they are handled")
     note(
-        "<b>1 · Sesiones de pantalla solapadas.</b> 77 <code>SCREEN_ON</code> en "
-        "el usuario A y 411 en el B ocurren con la pantalla ya encendida, "
-        "compensados más tarde por <code>SCREEN_OFF</code> consecutivos. El dato "
-        "no dice qué apagado cierra qué encendido, y elegir mal cambia el "
-        "resultado en las dos direcciones: emparejando en pila salen 64,9 h en "
-        "el usuario A (+6 %, el solape se cuenta dos veces) y en cola 56,7 h "
-        "(−7 %, se pierde el tramo sobrante).<br>"
-        "La pantalla se modela como <b>contador de profundidad</b> (ON suma, OFF "
-        "resta; encendida mientras &gt; 0), que devuelve la <b>unión</b> de los "
-        "tramos: <b>61,1 h</b>. La unión no depende del emparejamiento elegido, "
-        "y es lo que significa «la pantalla estuvo encendida»."
+        "<b>1 · Overlapping screen stretches.</b> 77 <code>SCREEN_ON</code> in "
+        "user A and 411 in user B fire while the screen is already on, balanced "
+        "later by consecutive <code>SCREEN_OFF</code>. The data does not say "
+        "which OFF closes which ON, and choosing wrong changes the result in "
+        "both directions: pairing as a stack gives 64.9 h for user A (+6 %, the "
+        "overlap counted twice) and as a queue 56.7 h (−7 %, the trailing "
+        "stretch lost).<br>"
+        "The screen is modelled as a <b>depth counter</b> (ON adds, OFF "
+        "subtracts; on while &gt; 0), which returns the <b>union</b> of the "
+        "stretches: <b>61.1 h</b>. The union does not depend on the pairing "
+        "chosen, and it is what \"the screen was on\" means."
         "<br><br>"
-        "<b>2 · Días truncados por el borde del fichero.</b> El fichero del "
-        "usuario B termina a las 00:46 del 31 de mayo. Ese día tiene 0,8 h de "
-        "cobertura y queda excluido de medias, rankings, mapa de calor y "
-        "bloqueos; sus eventos sí computan en la noche del día 30. Sin ese "
-        "filtro la media de pantalla del usuario B baja de 261,8 a 253,7 min."
+        "<b>2 · Days truncated by the file edge.</b> User B's file ends at 00:46 "
+        "on 31 May. That day has 0.8 h of coverage and is excluded from "
+        "averages, rankings, the heatmap and blocks; its events do still count "
+        "towards the night of the 30th. Without that filter, user B's mean "
+        "screen time drops from 261.8 to 253.7 min."
         "<br><br>"
-        "<b>3 · Primer desbloqueo con suelo a las 06:00.</b> Con el corte de día "
-        "a medianoche, un día que arranca a las 00:20 (cola de la noche anterior) "
-        "se registraría como inicio de jornada. El primer desbloqueo se define "
-        "como el primero a partir de las 06:00; la madrugada se contabiliza "
-        "aparte."
+        "<b>3 · First unlock floored at 06:00.</b> With the day cutting at "
+        "midnight, a day starting at 00:20 (the tail of the previous night) "
+        "would register as the start of a working day. The first unlock is "
+        "defined as the first one from 06:00 onwards; the small hours are "
+        "counted separately."
         "<br><br>"
-        "<b>4 · Tramos que cruzan medianoche.</b> Se parten en el corte de día "
-        "para que el tiempo de pantalla diario sume exactamente el día."
+        "<b>4 · Stretches crossing midnight.</b> They are split at the day "
+        "boundary so daily screen time adds up to exactly that day."
         "<br><br>"
-        "<b>5 · Guardas que no llegan a activarse aquí.</b> Eventos de app o URL "
-        "con la pantalla apagada, <code>USER_PRESENT</code> sin "
-        "<code>SCREEN_ON</code> previo y apps en primer plano más de 45 minutos "
-        "están contemplados en el código y no ocurren en estos dos ficheros. La "
-        "única anomalía que sí aparece son 4 <code>USER_PRESENT</code> "
-        "duplicados dentro de un mismo tramo en el usuario A y 6 en el B, que "
-        "quedan registrados en vez de descartarse en silencio."
+        "<b>5 · Guards that never trigger here.</b> App or URL events with the "
+        "screen off, <code>USER_PRESENT</code> with no preceding "
+        "<code>SCREEN_ON</code>, and apps in the foreground for more than 45 "
+        "minutes are all handled in the code and do not occur in these two "
+        "files. The one anomaly that does show up is 4 duplicate "
+        "<code>USER_PRESENT</code> inside a single stretch in user A and 6 in "
+        "user B, recorded rather than dropped silently."
     )
 
-    st.markdown("### De evento a métrica")
+    st.markdown("### From event to metric")
     st.dataframe(pd.DataFrame([
-        ("Tiempo de pantalla", "Unión de intervalos SCREEN_ON→SCREEN_OFF, partida a medianoche."),
-        ("Pickup real", "SCREEN_ON con un USER_PRESENT antes del siguiente ON/OFF."),
-        ("Vistazo", "SCREEN_ON sin USER_PRESENT: la pantalla se encendió, el teléfono no se abrió."),
-        ("Tiempo por app", "De APP_FOREGROUND al siguiente cambio de foreground, BLOCK o apagado. Tope 45 min."),
-        ("Tiempo por dominio", "Igual, pero URL_VISIT le quita el tiempo al navegador y se lo queda el dominio."),
-        ("Franja nocturna", "23:00 del día D → 06:00 del día D+1. El día natural corta a medianoche; el sueño no."),
-        ("Desconexión más larga", "Mayor hueco sin pantalla dentro de la vigilia (07:00–23:00)."),
-        ("Cambio de app", "Transición real de foreground entre paquetes distintos."),
-        ("Cuota de distracción", "Minutos en SOCIAL_MEDIA + ENTERTAINMENT + GAMING sobre el tiempo atribuido."),
-        ("Tu normal", "Mediana móvil de los 14 días anteriores del propio usuario (mediana, no media: un día raro no debe mover el listón)."),
-    ], columns=["Métrica", "Cómo se deriva"]), width="stretch", hide_index=True)
+        ("Screen time", "Union of SCREEN_ON→SCREEN_OFF intervals, split at midnight."),
+        ("Real pickup", "A SCREEN_ON with a USER_PRESENT before the next ON/OFF."),
+        ("Glance", "A SCREEN_ON with no USER_PRESENT: the screen came on, the phone never opened."),
+        ("Time per app", "From APP_FOREGROUND to the next foreground change, BLOCK or screen off. Capped at 45 min."),
+        ("Time per domain", "The same, but a URL_VISIT takes the time off the browser and the domain keeps it."),
+        ("Night band", "23:00 on day D → 06:00 on day D+1. The calendar day cuts at midnight; sleep does not."),
+        ("Longest disconnection", "Largest screen-free gap inside the waking window (07:00–23:00), with the moment it starts."),
+        ("App switch", "A real foreground transition between different packages, reset each day."),
+        ("Distraction share", "Minutes in SOCIAL_MEDIA + ENTERTAINMENT + GAMING over attributed time."),
+        ("Your normal", "Rolling median of the same user's previous 14 days (median, not mean: one odd day should not move the bar)."),
+    ], columns=["Metric", "How it is derived"]), width="stretch", hide_index=True)
 
-    st.markdown("### Cobertura de la atribución")
-    kpis([(f"{u} · pantalla reconstruida", f"{U[u]['screen_h']:.0f} h", None)
+    st.markdown("### How much screen time we manage to explain")
+    kpis([(f"{u} · screen reconstructed", f"{U[u]['screen_h']:.0f} h", None)
           for u in DATA] +
-         [(f"{u} · atribuido a app/sitio",
+         [(f"{u} · attributed to app/site",
            f"{U[u]['attributed_h']/U[u]['screen_h']*100:.0f} %", None) for u in DATA])
     st.caption(
-        "El resto es pantalla encendida sin app en primer plano: pantalla de "
-        "bloqueo, escritorio y notificaciones. El 67 % del usuario B frente al "
-        "86 % del A es consistente con su patrón de encendidos frecuentes que no "
-        "llegan a abrir contenido."
+        "The rest is screen-on time with no app in the foreground: lock screen, "
+        "home screen and notifications. User B's 67 % against user A's 86 % is "
+        "consistent with their pattern of frequent wake-ups that never open "
+        "anything."
     )
 
-    st.markdown("### El índice, componente a componente")
+    st.markdown("### The index, component by component")
     st.dataframe(pd.DataFrame([
         (label, f"{good:g}", f"{bad:g}", f"{w*100:.0f} %")
         for col, label, good, bad, w in COMPONENTS],
-        columns=["Componente", "Valor que da 100", "Valor que da 0", "Peso"]),
+        columns=["Component", "Value scoring 100", "Value scoring 0", "Weight"]),
         width="stretch", hide_index=True)
     c1, c2 = st.columns(2)
     for col, u in ((c1, "A"), (c2, "B")):
@@ -1264,9 +1258,9 @@ with TABS[7]:
         col.plotly_chart(charts.score_breakdown(contributions(mean_row), u),
                          width="stretch", key=f"k_breakdown_{u}")
     note(
-        "Los bloqueos no puntúan en el índice. Un <code>BLOCK</code> indica que "
-        "el filtro actuó y el contenido no se abrió; descontar puntos por el "
-        "intento penalizaría al usuario por algo que el producto ya ha resuelto "
-        "e incentivaría desactivar la protección. Los bloqueos alimentan las "
-        "reglas de aviso y el resumen del tutor, no la puntuación."
+        "Blocks do not score in the index. A <code>BLOCK</code> means the filter "
+        "acted and the content never opened; docking points for the attempt "
+        "would penalise the user for something the product already handled and "
+        "would create an incentive to turn the protection off. Blocks feed the "
+        "alert rules and the guardian digest, not the score."
     )

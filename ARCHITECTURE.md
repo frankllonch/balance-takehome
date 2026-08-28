@@ -1,176 +1,179 @@
-# Arquitectura
+# Architecture
 
-Documento para quien tenga que **cambiar** esto, no para quien tenga que
-evaluarlo. El razonamiento de producto y los hallazgos están en
-[`README.md`](README.md); el enunciado original en [`BRIEF.md`](BRIEF.md) y el
-formato de entrada en [`SCHEMA.md`](SCHEMA.md).
-
----
-
-## 1 · La idea en una frase
-
-El fichero de eventos es el **sistema de registro**: inmutable, la única
-fuente de verdad. Todo lo demás (tramos de pantalla, métricas diarias, índice,
-avisos) es **dato derivado**: una función pura y determinista de ese log. Nada
-se guarda a medias, nada depende del reloj de ejecución, y borrar cualquier
-derivado y recalcularlo devuelve exactamente lo mismo.
-
-De ahí salen dos reglas que conviene no romper:
-
-1. **Una derivación, un dueño.** Si dos sitios calculan la misma cosa, tarde o
-   temprano discrepan. `daily_frame` asigna la semana; nadie más la recalcula.
-2. **Núcleo sin framework.** `events`, `metrics`, `score` e `intelligence` no
-   importan Streamlit ni Plotly. El dashboard y el CLI son adaptadores, y por eso
-   pueden probarse por separado y no pueden desincronizarse.
+A document for whoever has to **change** this, not for whoever has to assess it.
+The product reasoning and the findings are in [`README.md`](README.md); the
+shape of the input files is in [`INPUT_FORMAT.md`](INPUT_FORMAT.md).
 
 ---
 
-## 2 · Capas
+## 1 · The idea in one sentence
+
+The event file is the **system of record**: immutable, the single source of
+truth. Everything else (screen stretches, daily metrics, index, alerts) is
+**derived data**: a pure, deterministic function of that log. Nothing is half
+stored, nothing depends on the execution clock, and deleting any derivative and
+recomputing it returns exactly the same thing.
+
+Two rules follow, and neither is worth breaking:
+
+1. **One derivation, one owner.** If two places compute the same thing, sooner
+   or later they disagree. `daily_frame` assigns the week; nobody else
+   recomputes it.
+2. **A core with no framework.** `events`, `metrics`, `score` and `intelligence`
+   import neither Streamlit nor Plotly. The dashboard and the CLI are adapters,
+   which is why they can be tested separately and cannot drift apart.
+
+---
+
+## 2 · Layers
 
 ```
-data/*.json          log de eventos · sistema de registro · inmutable
+data/*.json          event log · system of record · immutable
        │
        ▼
-balance/events.py    CAPA 0 · reconstrucción
-                     · máquina de estados de pantalla (contador de profundidad)
-                     · pickups frente a vistazos
-                     · atribución de tiempo a app y a dominio
+balance/events.py    LAYER 0 · reconstruction
+                     · screen state machine (depth counter)
+                     · pickups against glances
+                     · time attribution to app and to domain
                      → Timeline(intervals, usages, blocks, anomalies)
        │
        ▼
-balance/metrics.py   CAPA 1 · agregación
-                     · daily_frame(): una fila por día, ~40 columnas
-                     · weekly_frame(): una fila por semana, con variaciones
+balance/metrics.py   LAYER 1 · aggregation
+                     · daily_frame(): one row per day, ~65 columns
+                     · weekly_frame(): one row per week, with changes
                      · totals(), category_daily(), hourly_heat(), blocks_frame()
        │
        ▼
-balance/score.py     CAPA 2 · índice 0–100
-                     · cinco componentes ponderados + descomposición
+balance/score.py     LAYER 2 · 0 to 100 index
+                     · five weighted components + breakdown
        │
        ▼
-balance/intelligence.py  CAPA 3 · decisión
-                     · reglas de aviso (tutor) con presupuesto de silencio
-                     · reglas de refuerzo (usuario y tutor) con cupo semanal
-                     · nudge nocturno + replay sobre el historial
-                     · month_replay(): estado del sistema día a día
+balance/intelligence.py  LAYER 3 · decision
+                     · guardian alert rules with a silence budget
+                     · reinforcement rules (user and guardian) with a weekly quota
+                     · night nudge + replay over history
+                     · month_replay(): system state day by day
        │
        ├──────────────┬──────────────────────────
        ▼              ▼
 balance/run.py    app.py + balance/charts.py + balance/theme.py
-CLI               dashboard Streamlit
+CLI               Streamlit dashboard
 ```
 
-`charts.py` y `theme.py` son presentación pura: reciben frames ya calculados y
-no deciden nada.
+`charts.py` and `theme.py` are pure presentation: they receive frames already
+computed and decide nothing.
 
 ---
 
-## 3 · Invariantes
+## 3 · Invariants
 
-Los tests los fijan; si tocas el código y alguno cae, es una decisión de
-producto, no un detalle a arreglar en silencio.
+The tests pin them; if you touch the code and one falls, that is a product
+decision, not a detail to fix quietly.
 
-| Invariante | Dónde se prueba |
+| Invariant | Where it is tested |
 |---|---|
-| Todo `SCREEN_ON` acaba clasificado como pickup o vistazo, sin perder ni duplicar | `test_metrics.py` |
-| El screen time de un día es la suma exacta de sus tramos | `test_metrics.py` |
-| Pantalla en vigilia + offline en vigilia = ventana de vigilia | `test_metrics.py` |
-| Los bloqueos por tipo suman el total | `test_data_contract.py` |
-| El índice está en [0, 100] y sus pesos suman 1 | `test_score.py` |
-| Empeorar una entrada nunca sube el índice | `test_score.py` |
-| Los bloqueos **no** afectan al índice | `test_score.py` |
-| El payload al tutor no contiene apps, dominios ni categorías | `test_intelligence.py` |
-| El recorrido sólo usa información anterior a cada fecha | `test_intelligence.py` |
-| Cargar dos veces el mismo fichero da el mismo frame | `test_metrics.py` |
-| CLI y dashboard calculan lo mismo | `test_cli.py` |
+| Every `SCREEN_ON` ends up classified as pickup or glance, none lost or duplicated | `test_metrics.py` |
+| A day's screen time is the exact sum of its stretches | `test_metrics.py` |
+| Waking screen time + waking offline = the waking window | `test_metrics.py` |
+| Blocks by type sum to the total | `test_data_contract.py` |
+| The index sits in [0, 100] and its weights sum to 1 | `test_score.py` |
+| Making an input worse never raises the index | `test_score.py` |
+| Blocks do **not** affect the index | `test_score.py` |
+| The guardian payload contains no apps, domains or categories | `test_intelligence.py` |
+| The walkthrough only uses information prior to each date | `test_intelligence.py` |
+| Loading the same file twice gives the same frame | `test_metrics.py` |
+| CLI and dashboard compute the same thing | `test_cli.py` |
 
 ---
 
-## 4 · Decisiones que parecen arbitrarias y no lo son
+## 4 · Decisions that look arbitrary and are not
 
-Cada una está comentada en el sitio donde vive, y tiene test.
+Each one is commented where it lives, and each one has a test.
 
-- **Contador de profundidad para la pantalla.** El log solapa sesiones y no dice
-  qué apagado cierra qué encendido. La unión de tramos no depende de esa
-  elección; cualquier emparejamiento sí, y se desvía en ambos sentidos.
-- **Dos convenciones de día.** El día natural corta a medianoche (lo pide el
-  enunciado); la noche va de las 23:00 a las 06:00 del día siguiente, porque el
-  sueño no corta a medianoche.
-- **Eje horario desplazado a las 04:00.** La madrugada se expresa como 24–28.
-  Sin eso, la media de "hora de última pantalla" *baja* cuando alguien se
-  acuesta más tarde.
-- **Días truncados fuera.** Un día que el fichero sólo cubre en parte no entra
-  en medias, rankings ni gráficos, pero sus eventos sí cuentan para la noche del
-  día anterior.
-- **Los cambios de app se reinician cada día**, o la primera app de la mañana
-  cuenta como cambio respecto a la última de la noche.
-
----
-
-## 5 · Cómo hacer los cambios más probables
-
-### Añadir una métrica diaria
-
-En `metrics.py`, dentro del `rows.append({...})` de `daily_frame`. Si es
-derivable de columnas ya existentes, mejor calcularla en `add_score` o en la
-capa que la use: `daily_frame` recorre eventos y debería quedarse con lo que
-necesita ese recorrido.
-
-### Añadir una regla de aviso
-
-1. Escribe `_mi_regla(df) -> list[Signal]` en `intelligence.py`.
-2. Añádela a `RULES`.
-3. Ponle `actionability` con criterio: por debajo de 0,5 nunca se notifica, va
-   a resumen semanal. Es la palanca con la que se decide qué merece interrumpir.
-4. Añade el test que fija en qué fecha dispara y en cuál no.
-
-### Añadir una regla de refuerzo
-
-Igual, pero en `POSITIVE_RULES`, devolviendo con el helper `_pos(...)`. Tres
-condiciones antes de escribirla:
-
-- compara contra el **propio historial** del usuario, no contra un umbral fijo;
-- exige margen (10 % en récords, 20–30 % en agregados semanales);
-- el texto describe, no recomienda. Hay un test que caza los imperativos.
-
-### Cambiar los pesos del índice
-
-`COMPONENTS` en `score.py`. Los tests de acotación y monotonía no dependen de la
-calibración, así que seguirán pasando; los de `test_data_contract.py` que citan
-cifras concretas sí, y eso es a propósito: si una recalibración cambia lo que el
-dashboard afirma, el test lo dice antes que el lector.
-
-### Añadir un perfil
-
-`PROFILES` en `run.py` y `HAS_GUARDIAN` en `app.py`. En producción esto vendría
-de la cuenta; hoy son dos constantes porque hay dos ficheros.
+- **Depth counter for the screen.** The log overlaps sessions and does not say
+  which OFF closes which ON. The union of stretches does not depend on that
+  choice; any pairing does, and it deviates in both directions.
+- **Two day conventions.** The calendar day cuts at midnight; the night runs
+  23:00 to 06:00 the next day, because sleep does not cut at midnight.
+- **Hour axis shifted to 04:00.** The small hours are expressed as 24 to 28.
+  Without it, the mean "time of last screen" *drops* when someone goes to bed
+  later.
+- **Truncated days out.** A day the file only partly covers does not enter
+  averages, rankings or charts, but its events do count towards the previous
+  day's night.
+- **App switches reset every day**, or the first app of the morning counts as a
+  switch from the last one of the night.
+- **Time bands are labelled by upper bound.** Hour 3 is early morning, not
+  morning. The list was off by one at one point and the test now pins it.
 
 ---
 
-## 6 · Límites conocidos
+## 5 · How to make the likely changes
 
-- **Un mes de datos.** Las reglas semanales necesitan 2–3 semanas de referencia,
-  así que las dos primeras semanas de cualquier perfil nuevo no generan nada.
-- **El detector de deriva usa referencia móvil**, así que deja de disparar
-  cuando el comportamiento nuevo se convierte en el normal. Es lo correcto para
-  avisar una vez, pero su silencio no significa "resuelto".
-- **La madrugada del primer día del periodo** pertenece a una noche anterior al
-  dato y no se contabiliza en ninguna fila.
-- **La cobertura de atribución no llega al 100 %** (86 % en A, 67 % en B): el
-  resto es pantalla de bloqueo, escritorio y notificaciones.
-- **Todo cabe en memoria.** Con 11.488 eventos sobra; con un año de un millón de
-  usuarios, `daily_frame` pasaría a un agregado incremental por día en el
-  dispositivo, que es donde debería vivir de todas formas.
+### Add a daily metric
+
+In `metrics.py`, inside the `rows.append({...})` of `daily_frame`. If it is
+derivable from columns that already exist, compute it in `add_score` or in the
+layer that uses it: `daily_frame` walks events and should keep only what that
+walk needs.
+
+### Add an alert rule
+
+1. Write `_my_rule(df) -> list[Signal]` in `intelligence.py`.
+2. Add it to `RULES`.
+3. Set `actionability` with judgement: below 0.5 it is never notified, it goes
+   to the weekly summary. That is the lever deciding what deserves an
+   interruption.
+4. Add the test pinning the date it fires and the one it does not.
+
+### Add a reinforcement rule
+
+The same, but in `POSITIVE_RULES`, returning through the `_pos(...)` helper.
+Three conditions before writing it:
+
+- it compares against the user's **own history**, not a fixed threshold;
+- it demands margin (10 % on records, 20 to 30 % on weekly aggregates);
+- the text describes, it does not recommend. A test catches imperatives.
+
+### Change the index weights
+
+`COMPONENTS` in `score.py`. The bounding and monotonicity tests do not depend on
+the calibration, so they will keep passing; the ones in
+`test_data_contract.py` citing concrete figures will not, and that is
+deliberate: if a recalibration changes what the dashboard claims, the test says
+so before the reader does.
+
+### Add a profile
+
+`PROFILES` in `run.py` and `HAS_GUARDIAN` in `app.py`. In production this would
+come from the account; today they are two constants because there are two files.
 
 ---
 
-## 7 · Comandos
+## 6 · Known limits
+
+- **One month of data.** The weekly rules need 2 to 3 weeks of reference, so the
+  first two weeks of any new profile generate nothing.
+- **The drift detector uses a rolling reference**, so it stops firing once the
+  new behaviour becomes the normal one. That is right for alerting once, but its
+  silence does not mean "resolved".
+- **The small hours of the first day** of the period belong to a night that
+  predates the data and are counted in no row.
+- **Attribution coverage does not reach 100 %** (86 % in A, 67 % in B): the rest
+  is lock screen, home screen and notifications.
+- **Everything fits in memory.** With 11,488 events that is plenty; with a year
+  of a million users, `daily_frame` would become a per-day incremental aggregate
+  on the device, which is where it should live anyway.
+
+---
+
+## 7 · Commands
 
 ```bash
-make install    # entorno + dependencias
-make test       # 93 tests
-make run        # análisis por consola
-make json       # el mismo análisis en JSON
-make csv        # frames diario y semanal a out/
-make dash       # dashboard en http://localhost:8501
+make install    # environment + dependencies
+make test       # 94 tests
+make run        # console analysis
+make json       # the same analysis as JSON
+make csv        # daily and weekly frames into out/
+make dash       # dashboard at http://localhost:8501
 ```

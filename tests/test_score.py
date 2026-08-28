@@ -1,10 +1,10 @@
 """
-Capa 2: el índice de bienestar.
+Layer 2: the wellbeing index.
 
-Lo que se prueba aquí no es "el número sale 83", que cambiaría con cualquier
-recalibración, sino las propiedades que el índice debe cumplir sea cual sea la
-calibración: rango acotado, monotonía en el sentido correcto, pesos que suman
-uno, y la decisión de producto de que los bloqueos no puntúen.
+What is tested here is not "the number comes out at 83", which would change
+with any recalibration, but the properties the index must hold whatever the
+calibration: bounded range, monotonicity in the right direction, weights that
+sum to one, and the product decision that blocks do not score.
 """
 
 from __future__ import annotations
@@ -15,63 +15,63 @@ import pytest
 from balance.score import COMPONENTS, _band, add_score, contributions
 
 
-def test_los_pesos_suman_uno():
+def test_the_weights_sum_to_one():
     assert abs(sum(w for *_r, w in COMPONENTS) - 1.0) < 1e-9
 
 
-def test_la_banda_interpola_y_recorta():
-    # menos es mejor
+def test_the_band_interpolates_and_clamps():
+    # lower is better
     assert _band(90, 90, 360) == 100
     assert _band(360, 90, 360) == 0
-    assert _band(10, 90, 360) == 100, "por debajo del ideal no se pasa de 100"
-    assert _band(9999, 90, 360) == 0, "por encima del peor no baja de 0"
+    assert _band(10, 90, 360) == 100, "below the ideal it does not exceed 100"
+    assert _band(9999, 90, 360) == 0, "above the worst it does not drop below 0"
     assert _band(225, 90, 360) == pytest.approx(50)
-    # más es mejor
+    # higher is better
     assert _band(4, 4, 1) == 100
     assert _band(1, 4, 1) == 0
     assert _band(2.5, 4, 1) == pytest.approx(50)
 
 
-def test_un_dato_ausente_no_rompe_el_indice():
-    """Un NaN puntúa 50, no propaga NaN al total."""
+def test_a_missing_value_does_not_break_the_index():
+    """A NaN scores 50, it does not propagate NaN into the total."""
     assert _band(float("nan"), 90, 360) == 50.0
 
 
-def test_el_indice_esta_acotado(df_a, df_b):
+def test_the_index_is_bounded(df_a, df_b):
     for df in (df_a, df_b):
         assert df["score"].between(0, 100).all()
 
 
-@pytest.mark.parametrize("col,peor", [
+@pytest.mark.parametrize("col,worse", [
     ("screen_min", 600), ("pickups", 200), ("night_min", 300),
 ])
-def test_empeorar_una_metrica_baja_el_indice(df_a, col, peor):
-    """Monotonía: si una entrada empeora, el índice no puede subir."""
-    peor_df = add_score(df_a.assign(**{col: peor}))
-    assert peor_df["score"].mean() < df_a["score"].mean()
+def test_making_a_metric_worse_lowers_the_index(df_a, col, worse):
+    """Monotonicity: if an input gets worse, the index cannot go up."""
+    worse_df = add_score(df_a.assign(**{col: worse}))
+    assert worse_df["score"].mean() < df_a["score"].mean()
 
 
-def test_los_bloqueos_no_puntuan(df_b):
-    """Decisión de producto, no detalle de implementación.
+def test_blocks_do_not_score(df_b):
+    """A product decision, not an implementation detail.
 
-    Un BLOCK significa que el filtro actuó y el contenido no se abrió. Si
-    descontase puntos, el usuario tendría el incentivo de desactivar la
-    protección para subir nota.
+    A BLOCK means the filter acted and the content never opened. If it docked
+    points, the user would have an incentive to turn the protection off to
+    raise their grade.
     """
-    sin_bloqueos = add_score(df_b.assign(blocks=0, blocks_sensitive=0,
-                                         blocks_app=0, blocks_url=0,
-                                         blocks_nudity=0))
-    pd.testing.assert_series_equal(sin_bloqueos["score"], df_b["score"])
+    no_blocks = add_score(df_b.assign(blocks=0, blocks_sensitive=0,
+                                      blocks_app=0, blocks_url=0,
+                                      blocks_nudity=0))
+    pd.testing.assert_series_equal(no_blocks["score"], df_b["score"])
 
 
-def test_la_descomposicion_suma_el_indice(df_b):
-    """El índice tiene que ser explicable: la suma de aportaciones es el total."""
-    fila = df_b.iloc[10]
-    c = contributions(fila)
-    assert c["points"].sum() == pytest.approx(fila["score"], abs=0.05)
+def test_the_breakdown_sums_to_the_index(df_b):
+    """The index has to be explainable: contributions add up to the total."""
+    row = df_b.iloc[10]
+    c = contributions(row)
+    assert c["points"].sum() == pytest.approx(row["score"], abs=0.05)
     assert (c["points"] + c["lost"]).sum() == pytest.approx(100, abs=1e-6)
 
 
-def test_los_componentes_estan_acotados(df_b):
+def test_the_components_are_bounded(df_b):
     for col, *_ in COMPONENTS:
         assert df_b[f"score_{col}"].between(0, 100).all()
